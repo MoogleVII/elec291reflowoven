@@ -33,7 +33,7 @@ CE_ADC EQU P2.0
 MY_MOSI EQU P2.1
 MY_MISO EQU P2.2
 MY_SCLK EQU P2.3
-
+;Set some pin for breaker box control -  plot with py to test
 
 CSEG
 
@@ -82,7 +82,6 @@ Inc_Done:
 	; 1000 milliseconds have passed.  Set a flag so the main program knows
 	setb seconds_flag ; Let the main program know half second had passed
 
-
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a
@@ -93,18 +92,18 @@ Timer2_ISR_done:
 	
 INIT_SPI:
 	setb MY_MISO ; Make MISO an input pin
-	clr MY_SCLK ; For mode (0,0) SCLK is zero
+	clr MY_SCLK  ; For mode (0,0) SCLK is zero
 	ret
 
 ; Configure the serial port and baud rate using timer 1
 InitSerialPort:
-    ; Since the reset button bounces, we need to wait a bit before
-    ; sending messages, or risk displaying gibberish!
+    ;Since the reset button bounces, we need to wait a bit before
+    ;sending messages, or risk displaying gibberish!
     mov R1, #222
     mov R0, #166
     djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
     djnz R1, $-4 ; 22.51519us*222=4.998ms
-    ; Now we can safely proceed with the configuration
+    ;Now we can safely proceed with the configuration
 	clr	TR1
 	anl	TMOD, #0x0f
 	orl	TMOD, #0x20
@@ -137,28 +136,30 @@ SendStringDone:
     
 newline:
 	DB  '\r', '\n', 0
+
 MainProgram:
-    mov SP, #7FH ; Set the stack pointer to the begining of idata
-    mov PMOD, #0 ; Configure all ports in bidirectional mode
-    lcall Timer2_Init ;init timer 2
-    setb EA   ; Enable Global interrupts
+    mov SP, #7FH 		; Set the stack pointer to the begining of idata
+    mov PMOD, #0 		; Configure all ports in bidirectional mode
+    lcall Timer2_Init   ;init timer 2
+    setb EA   			; Enable Global interrupts
     lcall InitSerialPort
-   	setb seconds_flag ; initialize flag to 1 for instant first loop
+   	setb seconds_flag   ; initialize flag to 1 for instant first loop
    	
 loop:    
-    jnb seconds_flag, loop ;only print to putty every 1 second
+    jnb seconds_flag, loop ;only send to serial every 1 second
     
 Read_Write:
-	
+	;TODO: Define some pin = OVEN
+	;connect pin to breaker box
+	; formula simplification: only set y points to be boundary positions
+	; ie one for first increase, one for stable point, one for second increase
+	; one for second stable point.
+	;change y to next step at each time signature (60sec,180sec,etc)
+		
 	clr seconds_flag
 	mov R1, #0x00   
     lcall DO_SPI_G 
-    ;Resting Temperature   ; 00 93(BCD) = 2.97V
-    			   		   ; 01 00(BCD) = 3.00V
-    mov y+0, #25   ; init y for conversion from voltage to temperature
-	mov y+1, #0
-	mov y+2, #0
-	mov y+3, #0
+    
     mov R1, #0
     Read_ADC_Channel(0) ;Read serial port from ADC channel 0
 
@@ -166,20 +167,38 @@ Read_Write:
     mov x+1, #0
     mov x+2, #0
     mov x+3, #0
-   	lcall mul32			;conversion x=x*25
-	mov y+0, #100   	;init y for conversion from voltage to temperature
-  	mov y+1, #0
-  	mov y+2, #0
-	mov y+3, #0
-   	lcall div32			;conversion x=x*25*1/100=temperature
-    
-    lcall hex2bcd		;convert X to BCD for display - result stored in BCD
-    send_bcd(bcd)		;write value of X to putty
+
+    ;mov y+0, (formula go here)   ; Set y to expected value of temperature
+	;mov y+1, #0
+	;mov y+2, #0
+	;mov y+3, #0
+	    
+    ;Compare the actual temp to expected temp
+	lcall x_lt_y    
+    jb mf, OVEN_ON 	;If actual < expected turn on oven
+	;cpl OVEN (??)
+    lcall x_gt_y
+    jb mf, OVEN_OFF	;If actual > expected turn off oven
+    jmp OVEN_STAY
+
+OVEN_ON:
+	;setb OVEN
+	jmp OVEN_STAY
+OVEN_OFF: 
+	;clr OVEN   
+OVEN_STAY:        
+	
+	;Print value in x to serial (may need to convert to 
+			;temperature if we are using voltage in main calculation
+    lcall hex2bcd		;convert x to BCD for display - result stored in BCD
+    send_bcd(bcd)		;write value of x to serial port
     mov DPTR, #newline  ;newline for readability by python
     lcall SendString		
-    ljmp loop			;loop
-    
-    ;Read serial port, 1 bit at a time, store in R1
+    ljmp loop			
+
+;----------------------------------------------;    
+;Read serial port, 1 bit at a time, store in R1
+;----------------------------------------------;
 DO_SPI_G:
 	push acc
 	mov R1, #0 ; Received byte stored in R1
