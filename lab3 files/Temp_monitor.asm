@@ -155,26 +155,33 @@ Read_Write:
     lcall DO_SPI_G 
     ;Resting Temperature   ; 00 93(BCD) = 2.97V
     			   		   ; 01 00(BCD) = 3.00V
-    mov y+0, #25   ; init y for conversion from voltage to temperature
+    mov y+0, #3   ; init y for conversion from voltage to temperature
 	mov y+1, #0
 	mov y+2, #0
 	mov y+3, #0
     mov R1, #0
     Read_ADC_Channel(0) ;Read serial port from ADC channel 0
-
-    mov x+0, R1			;Load X with low 8 bits of data (only 8 bits exist)
+    mov x+0, #0			;Load X with low 8 bits of data (only 8 bits exist)
     mov x+1, #0
     mov x+2, #0
     mov x+3, #0
-   	lcall mul32			;conversion x=x*25
-	mov y+0, #100   	;init y for conversion from voltage to temperature
-  	mov y+1, #0
-  	mov y+2, #0
-	mov y+3, #0
-   	lcall div32			;conversion x=x*25*1/100=temperature
     
+    mov x+0, R1
+
+   	;lc1all mul32			;conversion x=x*25
+	;mov y+0, #100   	;init y for conversion from voltage to temperature
+  	;mov y+1, #0
+  	;mov y+2, #0
+	;mov y+3, #0
+    ;lcall div32			;conversion x=x*25*1/100=temperature
+    lcall mul32
     lcall hex2bcd		;convert X to BCD for display - result stored in BCD
-    send_bcd(bcd)		;write value of X to putty
+    		;write value of X to putty
+    
+    send_bcd(bcd+3)
+    send_bcd(bcd+2)
+    send_bcd(bcd+1)
+    send_bcd(bcd)
     mov DPTR, #newline  ;newline for readability by python
     lcall SendString		
     ljmp loop			;loop

@@ -1,0 +1,353 @@
+                 -1   $MODLP52
+0000              1   ;  MODLP52: Register definition for Atmel's AT89LP52
+0000              2   ;
+0000              3   ;   Copyright (C) 2011-2015  Jesus Calvino-Fraga, jesusc at ece.ubc.ca
+0000              4   ;
+0000              5   ;   This library is free software; you can redistribute it and/or
+0000              6   ;   modify it under the terms of the GNU Lesser General Public
+0000              7   ;   License as published by the Free Software Foundation; either
+0000              8   ;   version 2.1 of the License, or (at your option) any later version.
+0000              9   ;
+0000             10   ;   This library is distributed in the hope that it will be useful,
+0000             11   ;   but WITHOUT ANY WARRANTY; without even the implied warranty of
+0000             12   ;   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+0000             13   ;   Lesser General Public License for more details.
+0000             14   ;
+0000             15   ;   You should have received a copy of the GNU Lesser General Public
+0000             16   ;   License along with this library; if not, write to the Free Software
+0000             17   ;   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+0000             18   ;
+0000             19   ;--------------------------------------------------------
+0000             20   ; Special Function Registers
+0000             21   ;--------------------------------------------------------
+0000             22   P0             DATA 0x80
+0000             23   P1             DATA 0x90
+0000             24   P2             DATA 0xa0
+0000             25   P3             DATA 0xb0
+0000             26   P4             DATA 0xc0
+0000             27   PMOD           DATA 0xc1
+0000             28   PSW            DATA 0xd0
+0000             29   ACC            DATA 0xe0
+0000             30   B              DATA 0xf0
+0000             31   SP             DATA 0x81
+0000             32   DPL            DATA 0x82
+0000             33   DPH            DATA 0x83
+0000             34   DP0L           DATA 0x82
+0000             35   DP0H           DATA 0x83
+0000             36   DP1L           DATA 0x84
+0000             37   DP1H           DATA 0x85
+0000             38   AUXR           DATA 0x8e
+0000             39   AUXR1          DATA 0xa2
+0000             40   DPCF           DATA 0xa2
+0000             41   TCON           DATA 0x88
+0000             42   TMOD           DATA 0x89
+0000             43   T2CON          DATA 0xc8
+0000             44   T2MOD          DATA 0xc9
+0000             45   TL0            DATA 0x8a
+0000             46   TL1            DATA 0x8b
+0000             47   TL2            DATA 0xcc
+0000             48   TH0            DATA 0x8c
+0000             49   TH1            DATA 0x8d
+0000             50   TH2            DATA 0xcd
+0000             51   TCONB          DATA 0x91
+0000             52   RCAP2L         DATA 0xca
+0000             53   RCAP2H         DATA 0xcb
+0000             54   WDTRST         DATA 0xa6
+0000             55   WDTCON         DATA 0xa7
+0000             56   SCON           DATA 0x98
+0000             57   SBUF           DATA 0x99
+0000             58   SADEN          DATA 0xb9
+0000             59   SADDR          DATA 0xa9
+0000             60   IE             DATA 0xa8
+0000             61   IP             DATA 0xb8
+0000             62   IPH            DATA 0xb7
+0000             63   PCON           DATA 0x87
+0000             64   CLKREG         DATA 0x8f
+0000             65   MEMCON         DATA 0x96
+0000             66   ;--------------------------------------------------------
+0000             67   ; special function bits
+0000             68   ;--------------------------------------------------------
+0000             69   SCK            BIT 0x97
+0000             70   MISO           BIT 0x96
+0000             71   MOSI           BIT 0x95
+0000             72   T2EX           BIT 0x91
+0000             73   T2             BIT 0x90
+0000             74   RD             BIT 0xb7
+0000             75   WR             BIT 0xb6
+0000             76   T1             BIT 0xb5
+0000             77   T0             BIT 0xb4
+0000             78   INT1           BIT 0xb3
+0000             79   INT0           BIT 0xb2
+0000             80   TXD            BIT 0xb1
+0000             81   RXD            BIT 0xb0
+0000             82   XTAL2          BIT 0xc7
+0000             83   XTAL1          BIT 0xc6
+0000             84   PSEN           BIT 0xc5
+0000             85   ALE            BIT 0xc4
+0000             86   CY             BIT 0xd7
+0000             87   AC             BIT 0xd6
+0000             88   F0             BIT 0xd5
+0000             89   RS1            BIT 0xd4
+0000             90   RS0            BIT 0xd3
+0000             91   OV             BIT 0xd2
+0000             92   UD             BIT 0xd1
+0000             93   P              BIT 0xd0
+0000             94   TF1            BIT 0x8f
+0000             95   TR1            BIT 0x8e
+0000             96   TF0            BIT 0x8d
+0000             97   TR0            BIT 0x8c
+0000             98   IE1            BIT 0x8b
+0000             99   IT1            BIT 0x8a
+0000            100   IE0            BIT 0x89
+0000            101   IT0            BIT 0x88
+0000            102   TF2            BIT 0xcf
+0000            103   EXF2           BIT 0xce
+0000            104   RCLK           BIT 0xcd
+0000            105   TCLK           BIT 0xcc
+0000            106   EXEN2          BIT 0xcb
+0000            107   TR2            BIT 0xca
+0000            108   C_T2           BIT 0xc9
+0000            109   CP_RL2         BIT 0xc8
+0000            110   SM0            BIT 0x9f
+0000            111   FE             BIT 0x9f
+0000            112   SM1            BIT 0x9e
+0000            113   SM2            BIT 0x9d
+0000            114   REN            BIT 0x9c
+0000            115   TB8            BIT 0x9b
+0000            116   RB8            BIT 0x9a
+0000            117   TI             BIT 0x99
+0000            118   RI             BIT 0x98
+0000            119   EA             BIT 0xaf
+0000            120   ET2            BIT 0xad
+0000            121   ES             BIT 0xac
+0000            122   ET1            BIT 0xab
+0000            123   EX1            BIT 0xaa
+0000            124   ET0            BIT 0xa9
+0000            125   EX0            BIT 0xa8
+0000            126   PT2            BIT 0xbd
+0000            127   PS             BIT 0xbc
+0000            128   PT1            BIT 0xbb
+0000            129   PX1            BIT 0xba
+0000            130   PT0            BIT 0xb9
+0000            131   PX0            BIT 0xb8
+0000              2   org 0000H
+0000 020345       3      ljmp MainProgram
+0003              4      
+002B              5   org 0x002B
+002B 0202E5       6            ljmp Timer2_ISR
+002E              7            
+0030              8   DSEG at 30H
+0030              9   
+0030             10   x:   ds 4
+0034             11   y:   ds 4
+0038             12   bcd: ds 5
+003D             13   Count1ms:     ds 2
+003F             14   
+0000             15   BSEG
+0000             16   mf: dbit 1
+0001             17   seconds_flag: dbit 1
+0002             18   
+0002             19   
+                602   $LIST
+                 21   $LIST
+02D2             23   
+02D2             24   CLK  EQU 22118400
+02D2             25   BAUD equ 115200
+02D2             26   T1LOAD equ (0x100-(CLK/(16*BAUD)))
+02D2             27   
+02D2             28   TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
+02D2             29   TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
+02D2             30   
+02D2             31   ; These ’EQU’ must match the wiring between the microcontroller and ADC
+02D2             32   CE_ADC EQU P2.0
+02D2             33   MY_MOSI EQU P2.1
+02D2             34   MY_MISO EQU P2.2
+02D2             35   MY_SCLK EQU P2.3
+02D2             36   
+02D2             37   
+02D2             38   CSEG
+02D2             39   
+02D2             40   ;---------------------------------;
+02D2             41   ; Routine to initialize the ISR   ;
+02D2             42   ; for timer 2                     ;
+02D2             43   ;---------------------------------;
+02D2             44   Timer2_Init:
+02D2 75C800      45            mov T2CON, #0 ; Stop timer/counter.  Autoreload mode.
+02D5 75CBA9      46            mov RCAP2H, #high(TIMER2_RELOAD)
+02D8 75CA9A      47            mov RCAP2L, #low(TIMER2_RELOAD)
+02DB             48            ; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
+02DB E4          49            clr a
+02DC F53D        50            mov Count1ms+0, a
+02DE F53E        51            mov Count1ms+1, a
+02E0             52            ; Enable the timer and interrupts
+02E0 D2AD        53       setb ET2  ; Enable timer 2 interrupt
+02E2 D2CA        54       setb TR2  ; Enable timer 2
+02E4 22          55            ret
+02E5             56   
+02E5             57   
+02E5             58   ;---------------------------------;
+02E5             59   ; ISR for timer 2                 ;
+02E5             60   ;---------------------------------;
+02E5             61   Timer2_ISR:
+02E5 C2CF        62            clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
+02E7 B2B6        63            cpl P3.6 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
+02E9             64            
+02E9             65            ; The two registers used in the ISR must be saved in the stack
+02E9 C0E0        66            push acc
+02EB C0D0        67            push psw
+02ED             68            
+02ED             69            ; Increment the 16-bit one mili second counter
+02ED 053D        70            inc Count1ms+0    ; Increment the low 8-bits first
+02EF E53D        71            mov a, Count1ms+0 ; If the low 8-bits overflow, then increment high 8-bits
+02F1 7002        72            jnz Inc_Done
+02F3 053E        73            inc Count1ms+1
+02F5             74   
+02F5             75   Inc_Done:
+02F5             76            ; Check if second has passed
+02F5 E53D        77            mov a, Count1ms+0
+02F7 B4E80C      78            cjne a, #low(1000), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+02FA E53E        79            mov a, Count1ms+1
+02FC B40307      80            cjne a, #high(1000), Timer2_ISR_done
+02FF             81            
+02FF             82            ; 1000 milliseconds have passed.  Set a flag so the main program knows
+02FF D201        83            setb seconds_flag ; Let the main program know half second had passed
+0301             84   
+0301             85   
+0301 E4          86            clr a
+0302 F53D        87            mov Count1ms+0, a
+0304 F53E        88            mov Count1ms+1, a
+0306             89   Timer2_ISR_done:
+0306 D0D0        90            pop psw
+0308 D0E0        91            pop acc
+030A 32          92            reti    
+030B             93            
+030B             94   INIT_SPI:
+030B D2A2        95            setb MY_MISO ; Make MISO an input pin
+030D C2A3        96            clr MY_SCLK ; For mode (0,0) SCLK is zero
+030F 22          97            ret
+0310             98   
+0310             99   ; Configure the serial port and baud rate using timer 1
+0310            100   InitSerialPort:
+0310            101       ; Since the reset button bounces, we need to wait a bit before
+0310            102       ; sending messages, or risk displaying gibberish!
+0310 79DE       103       mov R1, #222
+0312 78A6       104       mov R0, #166
+0314 D8FE       105       djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
+0316 D9FA       106       djnz R1, $-4 ; 22.51519us*222=4.998ms
+0318            107       ; Now we can safely proceed with the configuration
+0318 C28E       108            clr     TR1
+031A 53890F     109            anl     TMOD, #0x0f
+031D 438920     110            orl     TMOD, #0x20
+0320 438780     111            orl     PCON,#0x80
+0323 758DF4     112            mov     TH1,#T1LOAD
+0326 758BF4     113            mov     TL1,#T1LOAD
+0329 D28E       114            setb TR1
+032B 759852     115            mov     SCON,#0x52
+032E 22         116       ret
+032F            117   
+032F            118            
+032F            119   
+032F            120   ; Send a character using the serial port
+032F            121   putchar:
+032F 3099FD     122       jnb TI, putchar
+0332 C299       123       clr TI
+0334 F599       124       mov SBUF, a
+0336 22         125       ret
+0337            126   
+0337            127   ; Send a constant-zero-terminated string using the serial port
+0337            128   SendString:
+0337 E4         129       clr A
+0338 93         130       movc A, @A+DPTR
+0339 6006       131       jz SendStringDone
+033B 12032F     132       lcall putchar
+033E A3         133       inc DPTR
+033F 80F6       134       sjmp SendString
+0341            135   SendStringDone:
+0341 22         136       ret
+0342            137       
+0342            138   newline:
+0342 0D0A00     139            DB  '\r', '\n', 0
+0345            140   MainProgram:
+0345 75817F     141       mov SP, #7FH ; Set the stack pointer to the begining of idata
+0348 75C100     142       mov PMOD, #0 ; Configure all ports in bidirectional mode
+034B 1202D2     143       lcall Timer2_Init ;init timer 2
+034E D2AF       144       setb EA   ; Enable Global interrupts
+0350 120310     145       lcall InitSerialPort
+0353 D201       146            setb seconds_flag ; initialize flag to 1 for instant first loop
+0355            147            
+0355            148   loop:    
+0355 3001FD     149       jnb seconds_flag, loop ;only print to putty every 1 second
+0358            150       
+0358            151   Read_Write:
+0358            152            
+0358 C201       153            clr seconds_flag
+035A 7900       154            mov R1, #0x00   
+035C 1203B4     155       lcall DO_SPI_G 
+035F            156       ;Resting Temperature   ; 00 93(BCD) = 2.97V
+035F            157                                               ; 01 00(BCD) = 3.00V
+035F 753403     158       mov y+0, #3   ; init y for conversion from voltage to temperature
+0362 753500     159            mov y+1, #0
+0365 753600     160            mov y+2, #0
+0368 753700     161            mov y+3, #0
+036B 7900       162       mov R1, #0
+036D 75F000     163            mov b, #0
+0370 120044     163            lcall _Read_ADC_Channel ;Read serial port from ADC channel 0
+0373 753000     164       mov x+0, #0                  ;Load X with low 8 bits of data (only 8 bits exist)
+0376 753100     165       mov x+1, #0
+0379 753200     166       mov x+2, #0
+037C 753300     167       mov x+3, #0
+037F            168       
+037F 8930       169       mov x+0, R1
+0381            170   
+0381            171            ;lc1all mul32                   ;conversion x=x*25
+0381            172            ;mov y+0, #100          ;init y for conversion from voltage to temperature
+0381            173            ;mov y+1, #0
+0381            174            ;mov y+2, #0
+0381            175            ;mov y+3, #0
+0381            176       ;lcall div32                         ;conversion x=x*25*1/100=temperature
+0381 1201DC     177       lcall mul32
+0384 120062     178       lcall hex2bcd                ;convert X to BCD for display - result stored in BCD
+0387            179                    ;write value of X to putty
+0387            180       
+0387 C000       181       push ar0
+0389 A83B       181       mov r0, bcd+3
+038B 12002E     181       lcall ?Send_BCD
+038E D000       181       pop ar0
+0390 C000       182       push ar0
+0392 A83A       182       mov r0, bcd+2
+0394 12002E     182       lcall ?Send_BCD
+0397 D000       182       pop ar0
+0399 C000       183       push ar0
+039B A839       183       mov r0, bcd+1
+039D 12002E     183       lcall ?Send_BCD
+03A0 D000       183       pop ar0
+03A2 C000       184       push ar0
+03A4 A838       184       mov r0, bcd
+03A6 12002E     184       lcall ?Send_BCD
+03A9 D000       184       pop ar0
+03AB 900342     185       mov DPTR, #newline  ;newline for readability by python
+03AE 120337     186       lcall SendString             
+03B1 020355     187       ljmp loop                    ;loop
+03B4            188       
+03B4            189       ;Read serial port, 1 bit at a time, store in R1
+03B4            190   DO_SPI_G:
+03B4 C0E0       191            push acc
+03B6 7900       192            mov R1, #0 ; Received byte stored in R1
+03B8 7A08       193            mov R2, #8 ; Loop counter (8-bits)
+03BA            194            DO_SPI_G_LOOP:
+03BA E8         195            mov a, R0 ; Byte to write is in R0
+03BB 33         196            rlc a ; Carry flag has bit to write
+03BC F8         197            mov R0, a
+03BD 92A1       198            mov MY_MOSI, c
+03BF D2A3       199            setb MY_SCLK ; Transmit
+03C1 A2A2       200            mov c, MY_MISO ; Read received bit
+03C3 E9         201            mov a, R1 ; Save received bit in R1
+03C4 33         202            rlc a
+03C5 F9         203            mov R1, a
+03C6 C2A3       204            clr MY_SCLK
+03C8 DAF0       205            djnz R2, DO_SPI_G_LOOP
+03CA D0E0       206            pop acc
+03CC 22         207            ret
+03CD            208            
+03CD            209   
+03CD            210   END
