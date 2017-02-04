@@ -10,6 +10,45 @@ $NOLIST
 
 CSEG
 
+
+;----------------------------------------------------
+;change reload for timer 1 based on value of pwm
+;
+;----------------------------------------------------
+SET_PWM mac
+
+push acc
+	push psw
+	push AR0
+	push AR1
+	push AR2
+	
+	mov r0, %0
+	mov a, #100
+	cjne r0, a, pwr_20
+	mov a, #20
+	cjne r0, a, pwr_0
+pwr_100:
+	;set timer to something that corresponds to 100% on time
+	mov power_time+0, #low(1000)
+	mov power_time+1, #high(1000)
+	jmp end_set_pwm
+pwr_20:
+	;set timer to 20% on
+	mov power_time+0, #low(200)
+	mov power_time+1, #high(200)
+	jmp end_set_pwm
+pwr_0:
+	;disable timer 1
+	mov power_time+0, #0
+	mov power_time+1, #0
+
+end_set_pwm:
+	pop AR2
+	pop AR1
+	pop AR0
+	pop psw
+endmac
 ;----------------------------------------------------
 ; Converts the 32-bit hex number in 'x' to a 
 ; 10-digit packed BCD in 'bcd' using the

@@ -9,7 +9,7 @@ $MODLP52
 $LIST
 
 CLK           EQU 22118400 ; Microcontroller system crystal frequency in Hz
-TIMER0_RATE   EQU 4096     ; 2048Hz squarewave (peak amplitude of CEM-1203 speaker)
+TIMER0_RATE   EQU 1000 ;1000hz for timer tick of 1ms 
 TIMER0_RELOAD EQU ((65536-(CLK/TIMER0_RATE)))
 TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
@@ -52,14 +52,15 @@ org 0x002B
 
 ; In the 8051 we can define direct access variables starting at location 0x30 up to location 0x7F
 dseg at 0x30
-Count1ms:     ds 2 ; Used to determine when half second has passed
+Count1ms:     ds 2 ; Used for timer 2
+Count1ms_2:   ds 2 ; used for timer 0
 BCD_counter:  ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
 my_variable:  ds 1 ;
 state:        ds 1
 pwm:		  ds 1
 sec:		  ds 1
-
-; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
+power_time:   ds 2 ; to set how much time for oven power to be on
+ ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
@@ -93,8 +94,12 @@ Timer0_Init:
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	; Enable the timer and interrupts
+	; Init One millisecond interrupt counter.
     setb ET0  ; Enable timer 0 interrupt
     setb TR0  ; Start timer 0
+    clr a
+	mov Count1ms_2+0, a
+	mov Count1ms_2+1, a
 	ret
 
 ;---------------------------------;
@@ -109,7 +114,9 @@ Timer0_ISR:
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	setb TR0
-	cpl SOUND_OUT ; Connect speaker to P3.7!
+;increment counter
+;Some logic to enable bit for 100%, 20%, 0% of 1 sec based on variable vs counter
+
 	reti
 
 ;---------------------------------;
@@ -134,8 +141,7 @@ Timer2_Init:
 ;---------------------------------;
 Timer2_ISR:
 	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-	cpl P3.6 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
-	
+
 	; The two registers used in the ISR must be saved in the stack
 	push acc
 	push psw
@@ -155,7 +161,6 @@ Inc_Done:
 	
 	; 500 milliseconds have passed.  Set a flag so the main program knows
 	setb half_seconds_flag ; Let the main program know half second had passed
-	cpl TR0 ; Enable/disable timer/counter 0. This line creates a beep-silence-beep-silence sound.
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
 	mov Count1ms+0, a
@@ -273,7 +278,7 @@ main:
     setb half_seconds_flag
 	mov BCD_counter, #0x00
 	
-	clr state
+	mov state, #0
 	
 	lcall Load_Configuration
 	Set_Cursor(2, 14)
@@ -331,7 +336,7 @@ state3: ;cmp temp
 state3_done:
 	ljmp loop
 state4: ;cmp time
-	cjne a, #4, state_5
+	cjne a, #4, state5
 	mov pwm, #20
 	mov sec, #45
 	clr c
@@ -341,7 +346,7 @@ state4: ;cmp time
 state4_done:
 	ljmp loop
 state5: ;cmp temp
-	cjne a, #5, state_0
+	cjne a, #5, state0
 	mov pwm, #0
 	mov a, #60
 	clr c
