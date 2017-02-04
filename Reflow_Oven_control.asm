@@ -6,6 +6,8 @@
 $NOLIST
 $MODLP52
 
+; davin edit
+
 $LIST
 
 CLK           EQU 22118400 ; Microcontroller system crystal frequency in Hz
@@ -331,7 +333,7 @@ Load_Defaults: ; Load defaults if keys are incorrect
    mov MEMCON, #00000000B ; Disable access to data flash
    ret
 
-; Eight bit number to display passed in ‘a’.
+; Eight bit number to display passed in Â‘aÂ’.
 Display_Accumulator:
 	mov b, #100
 	div ab
