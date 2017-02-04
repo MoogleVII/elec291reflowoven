@@ -9,6 +9,8 @@ $MODLP52
 $LIST
 
 CLK           EQU 22118400 ; Microcontroller system crystal frequency in Hz
+BAUD equ 115200
+T1LOAD equ (0x100-(CLK/(16*BAUD)))
 TIMER0_RATE   EQU 1000 ;1000hz for timer tick of 1ms 
 TIMER0_RELOAD EQU ((65536-(CLK/TIMER0_RATE)))
 TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
@@ -52,6 +54,9 @@ org 0x002B
 
 ; In the 8051 we can define direct access variables starting at location 0x30 up to location 0x7F
 dseg at 0x30
+x:   ds 4
+y:   ds 4
+bcd: ds 5
 Count1ms:     ds 2 ; Used for timer 2
 Count1ms_2:   ds 2 ; used for timer 0
 BCD_counter:  ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
@@ -60,10 +65,12 @@ state:        ds 1
 pwm:		  ds 1
 sec:		  ds 1
 power_time:   ds 2 ; to set how much time for oven power to be on
- ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
+temp:		  ds 2
+; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
+mf: dbit 1
 
 cseg
 ; These 'equ' must match the wiring between the microcontroller and the LCD!
@@ -74,10 +81,17 @@ LCD_D4 equ P3.2
 LCD_D5 equ P3.3
 LCD_D6 equ P3.4
 LCD_D7 equ P3.5
+CE_ADC EQU P2.0
+MY_MOSI EQU P2.1
+MY_MISO EQU P2.2
+MY_SCLK EQU P2.3
 $NOLIST
 $include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
 $LIST
 
+$NOLIST
+$include(math32.inc) ; A library of LCD related functions and utility macros
+$LIST
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'BCD_counter: xx ', 0
 Line_2:           db 'my_variable: xxx', 0
@@ -104,8 +118,7 @@ Timer0_Init:
 
 ;---------------------------------;
 ; ISR for timer 0.  Set to execute;
-; every 1/4096Hz to generate a    ;
-; 2048 Hz square wave at pin P3.7 ;
+; PSW logic
 ;---------------------------------;
 Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
@@ -114,11 +127,101 @@ Timer0_ISR:
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	setb TR0
+	inc Count1ms_2+0    ; Increment the low 8-bits first
+	mov a, Count1ms_2+0 ; If the low 8-bits overflow, then increment high 8-bits
+	jnz Inc_Done_0
+	inc Count1ms_2+1
+
+Inc_Done_0:
+	; Check if half second has passed
+	mov a, Count1ms_2+0
+	cjne a, #low(1000), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
+	mov a, Count1ms_2+1
+	cjne a, #high(1000), Timer0_ISR_done
+	
+	; 1000 milliseconds have passed.  
+	
+	; Reset to zero the milli-seconds counter, it is a 16-bit variable
+	clr a
+	mov Count1ms_2+0, a
+	mov Count1ms_2+1, a
+	
+Timer0_ISR_done:
+	pop psw
+	pop acc
+	reti
+
+
 ;increment counter
 ;Some logic to enable bit for 100%, 20%, 0% of 1 sec based on variable vs counter
 
-	reti
+	
+INIT_SPI:
+	setb MY_MISO ; Make MISO an input pin
+	clr MY_SCLK ; For mode (0,0) SCLK is zero
+	ret
 
+; Configure the serial port and baud rate using timer 1
+InitSerialPort:
+    ; Since the reset button bounces, we need to wait a bit before
+    ; sending messages, or risk displaying gibberish!
+    mov R1, #222
+    mov R0, #166
+    djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
+    djnz R1, $-4 ; 22.51519us*222=4.998ms
+    ; Now we can safely proceed with the configuration
+	clr	TR1
+	anl	TMOD, #0x0f
+	orl	TMOD, #0x20
+	orl	PCON,#0x80
+	mov	TH1,#T1LOAD
+	mov	TL1,#T1LOAD
+	setb TR1
+	mov	SCON,#0x52
+    ret
+
+	
+
+; Send a character using the serial port
+putchar:
+    jnb TI, putchar
+    clr TI
+    mov SBUF, a
+    ret
+
+; Send a constant-zero-terminated string using the serial port
+SendString:
+    clr A
+    movc A, @A+DPTR
+    jz SendStringDone
+    lcall putchar
+    inc DPTR
+    sjmp SendString
+SendStringDone:
+    ret
+    
+DO_SPI_G:
+	push acc
+	mov R1, #0 ; Received byte stored in R1
+	mov R2, #8 ; Loop counter (8-bits)
+	DO_SPI_G_LOOP:
+	mov a, R0 ; Byte to write is in R0
+	rlc a ; Carry flag has bit to write
+	mov R0, a
+	mov MY_MOSI, c
+	setb MY_SCLK ; Transmit
+	mov c, MY_MISO ; Read received bit
+	mov a, R1 ; Save received bit in R1
+	rlc a
+	mov R1, a
+	clr MY_SCLK
+	djnz R2, DO_SPI_G_LOOP
+	pop acc
+	ret
+	
+    
+newline:
+	DB  '\r', '\n', 0
 ;---------------------------------;
 ; Routine to initialize the ISR   ;
 ; for timer 2                     ;
