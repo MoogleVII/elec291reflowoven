@@ -54,9 +54,9 @@ org 0x002B
 
 ; In the 8051 we can define direct access variables starting at location 0x30 up to location 0x7F
 dseg at 0x30
-x:   ds 4
-y:   ds 4
-bcd: ds 5
+x:   		  ds 4
+y:   		  ds 4
+bcd: 		  ds 5
 Count1ms:     ds 2 ; Used for timer 2
 Count1ms_2:   ds 2 ; used for timer 0
 BCD_counter:  ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
@@ -66,12 +66,13 @@ pwm:		  ds 1
 sec:		  ds 1
 power_time:   ds 2 ; to set how much time for oven power to be on
 temp:		  ds 2
+oven: 		  ds 1
 ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
 mf: dbit 1
-
+;oven: dbit 1
 cseg
 ; These 'equ' must match the wiring between the microcontroller and the LCD!
 LCD_RS equ P1.2
@@ -93,14 +94,15 @@ $NOLIST
 $include(math32.inc) ; A library of LCD related functions and utility macros
 $LIST
 ;                     1234567890123456    <- This helps determine the location of the counter
-Initial_Message:  db 'BCD_counter: xx ', 0
-Line_2:           db 'my_variable: xxx', 0
+Initial_Message:  db 'State           ', 0
+Line_2:           db 'oven            ', 0
 
 ;---------------------------------;
 ; Routine to initialize the ISR   ;
 ; for timer 0                     ;
 ;---------------------------------;
 Timer0_Init:
+	
 	mov a, TMOD
 	anl a, #0xf0 ; Clear the bits for timer 0
 	orl a, #0x01 ; Configure timer 0 as 16-timer
@@ -123,30 +125,39 @@ Timer0_Init:
 Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
 	; In mode 1 we need to reload the timer.
+	push acc
+	push psw
+	
 	clr TR0
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	setb TR0
+	
 	inc Count1ms_2+0    ; Increment the low 8-bits first
 	mov a, Count1ms_2+0 ; If the low 8-bits overflow, then increment high 8-bits
 	jnz Inc_Done_0
 	inc Count1ms_2+1
 
 Inc_Done_0:
+	
 	; Check if half second has passed
 	mov a, Count1ms_2+0
-	cjne a, #low(1000), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
+	;TODO change value in brackets to be a variable
+	
+	cjne a, #low(500), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
 	mov a, Count1ms_2+1
-	cjne a, #high(1000), Timer0_ISR_done
+	cjne a, #high(500), Timer0_ISR_done
 	
-	; 1000 milliseconds have passed.  
-	
+	; X milliseconds have passed - turn on or off oven 
+	inc temp
+	;x milliseconds have not passed, turn off oven
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
 	mov Count1ms_2+0, a
 	mov Count1ms_2+1, a
 	
 Timer0_ISR_done:
+	
 	pop psw
 	pop acc
 	reti
@@ -268,18 +279,8 @@ Inc_Done:
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a
-	; Increment the BCD counter
-	mov a, BCD_counter
-	jnb UPDOWN, Timer2_ISR_decrement
-	add a, #0x01
-	sjmp Timer2_ISR_da
-Timer2_ISR_decrement:
-	add a, #0x99 ; Adding the 10-complement of -1 is like subtracting 1.
-Timer2_ISR_da:
-	da a ; Decimal adjust instruction.  Check datasheet for more details!
-	mov BCD_counter, a
-	
-	;inc sec
+	; Increment the BCD counte	
+	;inc secs
 	
 Timer2_ISR_done:
 	pop psw
@@ -373,30 +374,51 @@ main:
     lcall Timer2_Init
     setb EA   ; Enable Global interrupts
     lcall LCD_4BIT
+    lcall InitSerialPort
+    setb half_seconds_flag
+	mov state, #0
+	mov pwm+0, #0
+	mov pwm+1, #0 
+	mov oven, #0 
+	mov temp, #125
+	
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
 	Set_Cursor(1, 1)
     Send_Constant_String(#Initial_Message)
 	Set_Cursor(2, 1)
     Send_Constant_String(#Line_2)
-    setb half_seconds_flag
-	mov BCD_counter, #0x00
-	
-	mov state, #0
-	
-	lcall Load_Configuration
-	Set_Cursor(2, 14)
-	mov a, my_variable
-	lcall Display_Accumulator
+    
+;	lcall Load_Configuration
+;	Set_Cursor(2, 14)
+;	mov a, my_variable
+;	lcall Display_Accumulator
 	
 	; After initialization the program stays in this 'forever' loop
 loop:
-	Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
-	Set_Cursor(2, 14)
-	mov a, my_variable
-	lcall Display_Accumulator
-	lcall Save_Configuration
+;Set pwm
+	SET_PWM(pwm)
+	;jmp loop
+    ;Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
+
+;display state & if oven is on or off
+	Set_Cursor(1 , 14)
 	mov a, state ;state keeps track of the state# we are in
+	lcall Display_Accumulator
+	
+	Set_Cursor(2, 14)
+	clr a
+	mov a, temp+0  ;my_variable
+	lcall Display_Accumulator
+
+	Set_Cursor(2, 10)
+	clr a
+	mov a, temp+1  ;my_variable
+	lcall Display_Accumulator
+
+;	lcall Save_Configuration
+	
 state0:
+	mov a, state
 	cjne a, #0, state1
 	mov pwm, #0
 	jb P0.1, state0_done
@@ -458,32 +480,5 @@ state5: ;cmp temp
 	mov state, #0
 state5_done:
 	ljmp loop
-
-
-loop_c:	
-	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
-	Wait_Milli_Seconds(#50)	; Debounce delay.  This macro is also in 'LCD_4bit.inc'
-	jb BOOT_BUTTON, loop_a  ; if the 'BOOT' button is not pressed skip
-	jnb BOOT_BUTTON, $		; Wait for button release.  The '$' means: jump to same instruction.
-	; A valid press of the 'BOOT' button has been detected, reset the BCD counter.
-	; But first stop timer 2 and reset the milli-seconds counter, to resync everything.
-	clr TR2                 ; Stop timer 2
-	clr a
-	mov Count1ms+0, a
-	mov Count1ms+1, a
-	; Now clear the BCD counter
-	mov BCD_counter, a
-	setb TR2                ; Start timer 2
-	ljmp loop_b             ; Display the new value
-	
-loop_a:
-	jnb half_seconds_flag, loop
-loop_b:
-    clr half_seconds_flag ; We clear this flag in the main loop, but it is set in the ISR for timer 2
-	Set_Cursor(1, 14)     ; the place in the LCD where we want the BCD counter value
-	Display_BCD(BCD_counter) ; This macro is also in 'LCD_4bit.inc'
-    ljmp loop
-
-
 		
 END
