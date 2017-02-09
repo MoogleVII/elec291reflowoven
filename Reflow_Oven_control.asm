@@ -9,20 +9,20 @@ $MODLP52
 $LIST
 
 CLK           EQU 22118400 ; Microcontroller system crystal frequency in Hz
-BAUD equ 115200
-T1LOAD equ (0x100-(CLK/(16*BAUD)))
+BAUD          equ 115200
+T1LOAD        equ (0x100-(CLK/(16*BAUD)))
 TIMER0_RATE   EQU 1000 ;1000hz for timer tick of 1ms 
 TIMER0_RELOAD EQU ((65536-(CLK/TIMER0_RATE)))
 TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
-BOOT_BUTTON   equ P4.5
-SOUND_OUT     equ P3.7
-SETBUTTON 		equ P0.6	
-CONTINUE        equ P0.0
-SHIFT_BUTTON  equ P0.7
-MY_VARIABLE_BUTTON  equ P0.4
-restart_button equ P0.1
+BOOT_BUTTON  		 equ P4.5
+SOUND_OUT    		 equ P3.7
+SETBUTTON 		     equ P0.6	
+CONTINUE    	     equ P0.0
+SHIFT_BUTTON         equ P0.7
+MY_VARIABLE_BUTTON   equ P0.4
+restart_button       equ P0.1
 
 
 ; Reset vector
@@ -55,24 +55,24 @@ bcd: 		  ds 5
 Count1ms:     ds 2 ; Used for timer 2
 Count1ms_2:   ds 2 ; used for timer 0
 BCD_counter:  ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
-my_variable:  ds 1 ;
+my_variable:  ds 1 
 state:        ds 1
 pwm:		  ds 2
 sec:		  ds 1
 power_time:   ds 2 ; to set how much time for oven power to be on
-tempreal :     ds 1
+tempreal :    ds 1 ; converted temperateure from ADC
 temp:		  ds 1
 oven: 		  ds 1
-temp1_ideal:	ds 2
-result:			ds 4
+temp1_ideal:  ds 2
+result:		  ds 4
 
 ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
-mf: dbit 1
-load_time_flag: dbit 1
-;oven: dbit 1
+mf: 			   dbit 1
+load_time_flag:    dbit 1
+
 cseg
 ; These 'equ' must match the wiring between the microcontroller and the LCD!
 LCD_RS equ P1.2
@@ -96,7 +96,7 @@ $LIST
 Initial_Message:  db 'State           ', 0
 Line_2:           db 'oven            ', 0
 
-Set_temp_prompt:           db 'Set Temp(T) or load mem(L)     ', 0
+Set_temp_prompt:  db 'Set Temp(T) or load mem(L)     ', 0
 
 ;                     
 T:  db 'T', 0
@@ -122,10 +122,10 @@ main:
     lcall InitSerialPort
     setb half_seconds_flag
 	mov state, #0
-	mov pwm+0, #low(250)
-	mov pwm+1, #high(250)
-	mov oven, #0 
-	mov temp, #125
+	mov pwm+0, #low(0) 		;initialize pwm to 0% 
+	mov pwm+1, #high(0)	
+	mov oven, #0 			;dummy variable for testing
+	mov temp, #125			; 		" 		"
 	
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
 	Set_Cursor(1, 1)
@@ -188,24 +188,24 @@ loop:
 
 
 ;//////////////math ends//////////////////////////////////////////////////////////////////////
-lcall hex2bcd
-mov tempreal+0, bcd+0
-mov tempreal+1, bcd+1
+	lcall hex2bcd
+	mov tempreal+0, bcd+0
+	mov tempreal+1, bcd+1
 
 
 ;;;;///////////////////////////////////////////DISPLAYING TO PUTTY;///////////////////////////////
-;send_bcd(bcd+1)
-;send_bcd(bcd+0)
-;mov a, #'\r'
-;lcall putchar
-;mov a, #'\n'
-;lcall putchar
+	;send_bcd(bcd+1)
+	;send_bcd(bcd+0)
+	;mov a, #'\r'
+	;lcall putchar
+	;mov a, #'\n'
+	;lcall putchar
 ;/////////////////////////////////////////////////////////////////////////////////////////////////
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 	
 
-Set_Cursor(2, 10)
+	Set_Cursor(2, 10)
 	mov a, tempreal+0
 	lcall Display_Accumulator
 	Set_Cursor(2, 8)
@@ -232,7 +232,7 @@ state0_done:
 	ljmp loop
 state1: ;cmp temp
 	cjne a, #1, state2
-	mov pwm+0, #low(500) ;100%duty cycle
+	mov pwm+0, #low(500) ;100%duty cycle (500/500ms = 100%)
 	mov pwm+0, #high(500) 
 	mov sec, #0
 	mov a, #150 ;change to memory temp at state1
@@ -244,7 +244,7 @@ state1_done:
 	ljmp loop
 state2: ;cmp time
 	cjne a, #2, state3
-	mov pwm+0, #low(100)
+	mov pwm+0, #low(100) ; 20% duty cycle (100/500ms = 20%)
 	mov pwm+1, #high(100)
 	mov a, #60
 	clr c
@@ -278,7 +278,7 @@ state4_done:
 	ljmp loop
 state5: ;cmp temp
 	;cjne a, #5, state0
-	mov pwm+0, #0
+	mov pwm+0, #0 ;Disable oven to let cooling happen
 	mov pwm+1, #0
 	mov a, #60
 	clr c
