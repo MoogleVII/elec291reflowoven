@@ -157,7 +157,7 @@ Timer2_Init:
 ;---------------------------------;
 Timer2_ISR:
 	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-
+	cpl P0.3
 	; The two registers used in the ISR must be saved in the stack
 	push acc
 	push psw
@@ -168,7 +168,16 @@ Timer2_ISR:
 	jnz Inc_Done
 	inc Count1ms+1
 
+	
+	
 Inc_Done:
+	clr c
+	mov a, count1ms+0
+	subb a, pwm+0
+	mov a, count1ms+1
+	subb a, pwm+1
+	mov P0.2, c
+
 	; Check if half second has passed
 	mov a, Count1ms+0
 	cjne a, #low(500), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
@@ -178,6 +187,7 @@ Inc_Done:
 	; 500 milliseconds have passed.  Set a flag so the main program knows
 	setb half_seconds_flag ; Let the main program know half second had passed
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
+
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a

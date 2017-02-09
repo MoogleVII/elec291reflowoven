@@ -57,7 +57,7 @@ Count1ms_2:   ds 2 ; used for timer 0
 BCD_counter:  ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
 my_variable:  ds 1 ;
 state:        ds 1
-pwm:		  ds 1
+pwm:		  ds 2
 sec:		  ds 1
 power_time:   ds 2 ; to set how much time for oven power to be on
 tempreal :     ds 1
@@ -116,114 +116,14 @@ main:
     mov SP, #0x7F
     mov PMOD, #0 ; Configure all ports in bidirectional mode
     lcall LCD_4BIT
-      
-  ;//////////////////////////////////////////////////////////////////////  
- ;/////////////////initialization subroutine//////////////////   
-  ;/////////////////////////////////////////////////////////////////  
-      Set_Cursor(1,1)
-    Send_Constant_String(#Set_temp_prompt)
-         
-    setb CONTINUE ; Before using as input...
-    setb SETBUTTON 
-    
-CONT1:
-
-	jb CONTINUE, SETorNOT			;button not pressed? Keep polling
-    ljmp doneprompt  
-      
-SETorNOT:
-	jnb SETBUTTON, TT		;button pressed?? if yes, go to AM loop
-	sjmp MM
-MM: 
-	 Set_Cursor(2,10)
-    Send_constant_string(#T)
-    clr load_time_flag
-    ljmp	CONT1
-TT:
-	Set_Cursor(2,10)
-    Send_constant_string(#M)
-    setb load_time_flag
-    ljmp	CONT1
-  
-doneprompt:   
-    ;at this point, the user has either chosen to use new values for the oven, or
-    ;load values from memory to be used with the oven
-    ;if the user chose to use new values, store those in flash memory
-    ;if the user requested old values, load those into memory
-    
-    
-    
-    
-     Wait_Milli_Seconds(#255)    
- Wait_Milli_Seconds(#255)  
-     Wait_Milli_Seconds(#255) 
-     Wait_Milli_Seconds(#255) 
-    ;/set temp 1 
- 
- 	
- 	
- 	setb CONTINUE 
-    setb SETBUTTON
-    mov a, #0x0
-        	
-	Set_Cursor(1,1)
-    Send_Constant_String(#SETTEMP1)
-
-	
-CONTINUE2?:
-    
-  	Set_Cursor(2, 10)     
-	Display_BCD(temp1_ideal)
-	Set_Cursor(2, 8) 
-	Display_BCD(temp1_ideal+1)
-  ; lcall Display_Accumulator
-	jb CONTINUE, SETHOURS?		;button not pressed, go to SETHOURS?
-    ljmp done2?  
-      
-SETHOURS?:
-	jnb SETBUTTON, HOURS_INCREASE		;button pressed? Increase
-	
-	sjmp CONTINUE2?						;button not pressed, keep polling to continue
-	
-HOURS_INCREASE: 
-	
-	mov a, temp1_ideal
-	add a, #0x10
-	da a
-	mov temp1_ideal, a
-	
-	Wait_Milli_Seconds(#100)
-	Wait_Milli_Seconds(#100)
-	
-	;mov r4, a ;r2 stores minutes
-	;cjne r4, #0x255, CONTINUE2?
-	
-	;mov temp1_ideal, #0x0
-	
-        
-    ljmp	CONTINUE2?
-    
-      
-done2?:     
-      
-    
-  ;//////////////////////////////////////////////////////////////////////  
- ;/////////////////end of initialization subroutine//////////////////   
-  ;/////////////////////////////////////////////////////////////////  
-   
-   
-   
     lcall Timer0_Init
     lcall Timer2_Init
-   
     setb EA 	;Enable Global interrups
-     
-    
     lcall InitSerialPort
     setb half_seconds_flag
 	mov state, #0
-	mov pwm+0, #0
-	mov pwm+1, #0 
+	mov pwm+0, #low(250)
+	mov pwm+1, #high(250)
 	mov oven, #0 
 	mov temp, #125
 	
@@ -240,9 +140,7 @@ done2?:
 	
 	; After initialization the program stays in this 'forever' loop
 loop:
-;Set pwm
-	;SET_PWM(pwm)
-	;jmp loop
+
     ;Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
 
 ;display state & if oven is on or off
@@ -252,44 +150,48 @@ loop:
 	
 	Set_Cursor(2, 14)
 	clr a
-	mov a, temp+0  ;my_variable
+	mov a, temp+0 
 	lcall Display_Accumulator
 	
 	
-	;;;;;;;;get thermocouple reading;;;;;;;;;;;;;;;;;;;;;;;;;
-clr CE_ADC
-mov R0, #00000001B ; Start bit:1
-lcall DO_SPI_G
-mov R0, #10000000B ; Single ended, read channel 0
-lcall DO_SPI_G
-mov a, R1 ; R1 contains bits 8 and 9
-anl a, #00000011B ; We need only the two least significant bits
-mov Result+1, a ; Save result high.
-mov x+1, a
-mov R0, #55H ; It doesn't matter what we transmit...
-lcall DO_SPI_G
-mov Result, R1 ; R1 contains bits 0 to 7. Save result low.
-mov x, R1
-setb CE_ADC
-mov x+2, #0
-mov x+3, #0
-Wait_milli_seconds(#255)
-Wait_milli_seconds(#255)
-Wait_milli_seconds(#255)
+;;;;;;;;get thermocouple reading;;;;;;;;;;;;;;;;;;;;;;;;;
+	clr CE_ADC
+	mov R0, #00000001B ; Start bit:1
+	lcall DO_SPI_G
+	mov R0, #10000000B ; Single ended, read channel 0
+	lcall DO_SPI_G
+	mov a, R1 ; R1 contains bits 8 and 9
+	anl a, #00000011B ; We need only the two least significant bits
+	mov Result+1, a ; Save result high.
+	mov x+1, a
+	mov R0, #55H ; It doesn't matter what we transmit...
+	lcall DO_SPI_G
+	mov Result, R1 ; R1 contains bits 0 to 7. Save result low.
+	mov x, R1
+	setb CE_ADC
+	mov x+2, #0
+	mov x+3, #0
+	Wait_milli_seconds(#255)
+	Wait_milli_seconds(#255)
+	Wait_milli_seconds(#255)
+	
+	
 ;;;;;math
+	load_Y(50000)
+	lcall mul32
+	load_Y(1023)
+	lcall div32 ;Causes weird delay for PWM
+	load_Y(128)
+	lcall div32
+	load_Y(23)
+	lcall add32
 
-load_Y(50000)
-lcall mul32
-load_Y(1023)
-lcall div32
-load_Y(128)
-lcall div32
-load_Y(23)
-lcall add32
 
 ;//////////////math ends//////////////////////////////////////////////////////////////////////
 lcall hex2bcd
-mov tempreal, bcd
+mov tempreal+0, bcd+0
+mov tempreal+1, bcd+1
+
 
 ;;;;///////////////////////////////////////////DISPLAYING TO PUTTY;///////////////////////////////
 ;send_bcd(bcd+1)
@@ -303,18 +205,24 @@ mov tempreal, bcd
 	
 	
 
-	Set_Cursor(2, 10)
-	display_BCD(tempreal)
+Set_Cursor(2, 10)
+	mov a, tempreal+0
+	lcall Display_Accumulator
+	Set_Cursor(2, 8)
+	mov a, tempreal+1
+	lcall Display_Accumulator
+	;display_BCD(tempreal)
 	Set_Cursor(2, 14)
 	clr a
 	mov a, temp  ;my_variable
 	lcall Display_Accumulator
 ;	lcall Save_Configuration
-	
+
 state0:
 	mov a, state
 	cjne a, #0, state1
-	mov pwm, #0
+	mov pwm+0, #0
+	mov pwm+1, #0
 	jb P0.1, state0_done
 	Wait_milli_seconds(#50)
 	jb P0.1, state0_done
@@ -324,7 +232,8 @@ state0_done:
 	ljmp loop
 state1: ;cmp temp
 	cjne a, #1, state2
-	mov pwm, #100 ;100%duty cycle
+	mov pwm+0, #low(500) ;100%duty cycle
+	mov pwm+0, #high(500) 
 	mov sec, #0
 	mov a, #150 ;change to memory temp at state1
 	clr c
@@ -335,7 +244,8 @@ state1_done:
 	ljmp loop
 state2: ;cmp time
 	cjne a, #2, state3
-	mov pwm, #20
+	mov pwm+0, #low(100)
+	mov pwm+1, #high(100)
 	mov a, #60
 	clr c
 	subb a,sec
@@ -345,7 +255,8 @@ state2_done:
 	ljmp loop
 state3: ;cmp temp
 	cjne a, #3, state4
-	mov pwm,#100
+	mov pwm+0, #low(500) ;100%duty cycle
+	mov pwm+0, #high(500)
 	mov sec, #0
 	mov a, #220 ;
 	clr c
@@ -356,7 +267,8 @@ state3_done:
 	ljmp loop
 state4: ;cmp time
 	cjne a, #4, state5
-	mov pwm, #20
+	mov pwm+0, #low(100)
+	mov pwm+1, #high(100)
 	mov sec, #45
 	clr c
 	subb a, sec
@@ -365,8 +277,9 @@ state4: ;cmp time
 state4_done:
 	ljmp loop
 state5: ;cmp temp
-	cjne a, #5, state0
-	mov pwm, #0
+	;cjne a, #5, state0
+	mov pwm+0, #0
+	mov pwm+1, #0
 	mov a, #60
 	clr c
 	subb a, temp ;if 
