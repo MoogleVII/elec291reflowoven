@@ -18,7 +18,8 @@ TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
 BOOT_BUTTON   equ P4.5
 SOUND_OUT     equ P3.7
-UPDOWN        equ P0.0
+SETBUTTON 		equ P0.6	
+CONTINUE        equ P0.0
 SHIFT_BUTTON  equ P0.7
 MY_VARIABLE_BUTTON  equ P0.4
 restart_button equ P0.1
@@ -27,31 +28,25 @@ restart_button equ P0.1
 ; Reset vector
 org 0x0000
     ljmp main
-
 ; External interrupt 0 vector (not used in this code)
 org 0x0003
 	reti
-
 ; Timer/Counter 0 overflow interrupt vector
 org 0x000B
 	ljmp Timer0_ISR
-
 ; External interrupt 1 vector (not used in this code)
 org 0x0013
 	reti
-
 ; Timer/Counter 1 overflow interrupt vector (not used in this code)
 org 0x001B
 	reti
-
 ; Serial port receive/transmit interrupt vector (not used in this code)
 org 0x0023 
 	reti
-	
 ; Timer/Counter 2 overflow interrupt vector
 org 0x002B
 	ljmp Timer2_ISR
-
+	
 ; In the 8051 we can define direct access variables starting at location 0x30 up to location 0x7F
 dseg at 0x30
 x:   		  ds 4
@@ -65,13 +60,18 @@ state:        ds 1
 pwm:		  ds 1
 sec:		  ds 1
 power_time:   ds 2 ; to set how much time for oven power to be on
-temp:		  ds 2
+tempreal :     ds 1
+temp:		  ds 1
 oven: 		  ds 1
+temp1_ideal:	ds 2
+result:			ds 4
+
 ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
 mf: dbit 1
+load_time_flag: dbit 1
 ;oven: dbit 1
 cseg
 ; These 'equ' must match the wiring between the microcontroller and the LCD!
@@ -88,292 +88,137 @@ MY_MISO EQU P2.2
 MY_SCLK EQU P2.3
 $NOLIST
 $include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
-$LIST
-
-$NOLIST
+$include(justin.inc)
 $include(math32.inc) ; A library of LCD related functions and utility macros
+;$include(setSTUFF.inc) ; setting the time and temps relating to the reflow oven
 $LIST
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'State           ', 0
 Line_2:           db 'oven            ', 0
 
-;---------------------------------;
-; Routine to initialize the ISR   ;
-; for timer 0                     ;
-;---------------------------------;
-Timer0_Init:
-	
-	mov a, TMOD
-	anl a, #0xf0 ; Clear the bits for timer 0
-	orl a, #0x01 ; Configure timer 0 as 16-timer
-	mov TMOD, a
-	mov TH0, #high(TIMER0_RELOAD)
-	mov TL0, #low(TIMER0_RELOAD)
-	; Enable the timer and interrupts
-	; Init One millisecond interrupt counter.
-    setb ET0  ; Enable timer 0 interrupt
-    setb TR0  ; Start timer 0
-    clr a
-	mov Count1ms_2+0, a
-	mov Count1ms_2+1, a
-	ret
+Set_temp_prompt:           db 'Set Temp(T) or load mem(L)     ', 0
 
-;---------------------------------;
-; ISR for timer 0.  Set to execute;
-; PSW logic
-;---------------------------------;
-Timer0_ISR:
-	;clr TF0  ; According to the data sheet this is done for us already.
-	; In mode 1 we need to reload the timer.
-	push acc
-	push psw
-	
-	clr TR0
-	mov TH0, #high(TIMER0_RELOAD)
-	mov TL0, #low(TIMER0_RELOAD)
-	setb TR0
-	
-	inc Count1ms_2+0    ; Increment the low 8-bits first
-	mov a, Count1ms_2+0 ; If the low 8-bits overflow, then increment high 8-bits
-	jnz Inc_Done_0
-	inc Count1ms_2+1
+;                     
+T:  db 'T', 0
+;                     
+M:  db 'M', 0
+CLEAR: db '                         ', 0
 
-Inc_Done_0:
-	
-	; Check if half second has passed
-	mov a, Count1ms_2+0
-	;TODO change value in brackets to be a variable
-	
-	cjne a, #low(500), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
-	mov a, Count1ms_2+1
-	cjne a, #high(500), Timer0_ISR_done
-	
-	; X milliseconds have passed - turn on or off oven 
-	inc temp
-	;x milliseconds have not passed, turn off oven
-	; Reset to zero the milli-seconds counter, it is a 16-bit variable
-	clr a
-	mov Count1ms_2+0, a
-	mov Count1ms_2+1, a
-	
-Timer0_ISR_done:
-	
-	pop psw
-	pop acc
-	reti
-
-
-;increment counter
-;Some logic to enable bit for 100%, 20%, 0% of 1 sec based on variable vs counter
-
-	
-INIT_SPI:
-	setb MY_MISO ; Make MISO an input pin
-	clr MY_SCLK ; For mode (0,0) SCLK is zero
-	ret
-
-; Configure the serial port and baud rate using timer 1
-InitSerialPort:
-    ; Since the reset button bounces, we need to wait a bit before
-    ; sending messages, or risk displaying gibberish!
-    mov R1, #222
-    mov R0, #166
-    djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
-    djnz R1, $-4 ; 22.51519us*222=4.998ms
-    ; Now we can safely proceed with the configuration
-	clr	TR1
-	anl	TMOD, #0x0f
-	orl	TMOD, #0x20
-	orl	PCON,#0x80
-	mov	TH1,#T1LOAD
-	mov	TL1,#T1LOAD
-	setb TR1
-	mov	SCON,#0x52
-    ret
-
-	
-
-; Send a character using the serial port
-putchar:
-    jnb TI, putchar
-    clr TI
-    mov SBUF, a
-    ret
-
-; Send a constant-zero-terminated string using the serial port
-SendString:
-    clr A
-    movc A, @A+DPTR
-    jz SendStringDone
-    lcall putchar
-    inc DPTR
-    sjmp SendString
-SendStringDone:
-    ret
-    
-DO_SPI_G:
-	push acc
-	mov R1, #0 ; Received byte stored in R1
-	mov R2, #8 ; Loop counter (8-bits)
-	DO_SPI_G_LOOP:
-	mov a, R0 ; Byte to write is in R0
-	rlc a ; Carry flag has bit to write
-	mov R0, a
-	mov MY_MOSI, c
-	setb MY_SCLK ; Transmit
-	mov c, MY_MISO ; Read received bit
-	mov a, R1 ; Save received bit in R1
-	rlc a
-	mov R1, a
-	clr MY_SCLK
-	djnz R2, DO_SPI_G_LOOP
-	pop acc
-	ret
-	
-    
-newline:
-	DB  '\r', '\n', 0
-;---------------------------------;
-; Routine to initialize the ISR   ;
-; for timer 2                     ;
-;---------------------------------;
-Timer2_Init:
-	mov T2CON, #0 ; Stop timer/counter.  Autoreload mode.
-	mov RCAP2H, #high(TIMER2_RELOAD)
-	mov RCAP2L, #low(TIMER2_RELOAD)
-	; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
-	clr a
-	mov Count1ms+0, a
-	mov Count1ms+1, a
-	; Enable the timer and interrupts
-    setb ET2  ; Enable timer 2 interrupt
-    setb TR2  ; Enable timer 2
-	ret
-
-;---------------------------------;
-; ISR for timer 2                 ;
-;---------------------------------;
-Timer2_ISR:
-	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-
-	; The two registers used in the ISR must be saved in the stack
-	push acc
-	push psw
-	
-	; Increment the 16-bit one mili second counter
-	inc Count1ms+0    ; Increment the low 8-bits first
-	mov a, Count1ms+0 ; If the low 8-bits overflow, then increment high 8-bits
-	jnz Inc_Done
-	inc Count1ms+1
-
-Inc_Done:
-	; Check if half second has passed
-	mov a, Count1ms+0
-	cjne a, #low(500), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
-	mov a, Count1ms+1
-	cjne a, #high(500), Timer2_ISR_done
-	
-	; 500 milliseconds have passed.  Set a flag so the main program knows
-	setb half_seconds_flag ; Let the main program know half second had passed
-	; Reset to zero the milli-seconds counter, it is a 16-bit variable
-	clr a
-	mov Count1ms+0, a
-	mov Count1ms+1, a
-	; Increment the BCD counte	
-	;inc secs
-	
-Timer2_ISR_done:
-	pop psw
-	pop acc
-	reti
-
-Save_Configuration:
-	; Erase FDATA page 1
-	clr EA ; No interrupts please!
-	mov MEMCON, #01011000B ; AERS=1, MWEN=1, DMEN=1
-	mov DPTR, #0x0000
-	mov a, #0xff
-	movx @DPTR, A
-	; Load page
-	mov MEMCON, #00111000B ; LDPG=1, MWEN=1, DMEN=1
-	; Save variables
-	mov a, my_variable
-	movx @DPTR, A
-	inc DPTR	
-	mov a, #0x55 ; First key value
-	movx @DPTR, A
-	inc DPTR	
-	mov a, #0xAA ; Second key value
-	movx @DPTR, A
-	mov MEMCON, #00011000B ; Copy page to flash
-	mov a, #0xff
-	movx @DPTR, A
-	mov MEMCON, #00000000B ; Disable further access to data flash
-	setb EA ; Re-enable interrupts
-	ret
-
-Load_Configuration:
-	mov MEMCON, #00001000B ; Enable read access to data flash
-	mov dptr, #0x0001 ;First key value location.  Must be 0x55
-	movx a, @dptr
-	cjne a, #0x55, Load_Defaults
-	inc dptr ; Second key value location.  Must be 0xaa
-	movx a, @dptr
-	cjne a, #0xaa, Load_Defaults
-	; Keys are good.  Load saved values.
-	mov dptr, #0x0000
-	movx a, @dptr
-	mov my_variable, a
-	mov MEMCON, #00000000B ; Disable further access to data flash
-	ret
-
-Load_Defaults: ; Load defaults if keys are incorrect
-   mov my_variable, #123
-   mov MEMCON, #00000000B ; Disable access to data flash
-   ret
-
-; Eight bit number to display passed in ‘a’.
-Display_Accumulator:
-	mov b, #100
-	div ab
-	orl a, #0x30 ; Convert hundreds to ASCII
-	lcall ?WriteData ; display ASCII
-	mov a, b    ; Remainder is in register b
-	mov b, #10
-	div ab
-	orl a, #0x30 ; Convert tens to ASCII
-	lcall ?WriteData ; display ASCII
-	mov a, b
-	orl a, #0x30 ; Convert units to ASCII
-	lcall ?WriteData ; display ASCII
-	ret
-	
-Change_8bit_Variable MAC
-    jb %0, %2
-    Wait_Milli_Seconds(#50)
-    jb %0, %2
-    jnb %0, $
-    jb SHIFT_BUTTON, skip%Mb
-    dec %1
-    sjmp skip%Ma
-skip%Mb:
-    inc %1
-skip%Ma:
-ENDMAC
-
+SETTEMP1: db 'Set Temp 1:',0
 ;---------------------------------;
 ; Main program. Includes hardware ;
 ; initialization and 'forever'    ;
 ; loop.                           ;
 ;---------------------------------;
 main:
+	
 	; Initialization
     mov SP, #0x7F
     mov PMOD, #0 ; Configure all ports in bidirectional mode
+    lcall LCD_4BIT
+      
+  ;//////////////////////////////////////////////////////////////////////  
+ ;/////////////////initialization subroutine//////////////////   
+  ;/////////////////////////////////////////////////////////////////  
+      Set_Cursor(1,1)
+    Send_Constant_String(#Set_temp_prompt)
+         
+    setb CONTINUE ; Before using as input...
+    setb SETBUTTON 
+    
+CONT1:
+
+	jb CONTINUE, SETorNOT			;button not pressed? Keep polling
+    ljmp doneprompt  
+      
+SETorNOT:
+	jnb SETBUTTON, TT		;button pressed?? if yes, go to AM loop
+	sjmp MM
+MM: 
+	 Set_Cursor(2,10)
+    Send_constant_string(#T)
+    clr load_time_flag
+    ljmp	CONT1
+TT:
+	Set_Cursor(2,10)
+    Send_constant_string(#M)
+    setb load_time_flag
+    ljmp	CONT1
+  
+doneprompt:   
+    ;at this point, the user has either chosen to use new values for the oven, or
+    ;load values from memory to be used with the oven
+    ;if the user chose to use new values, store those in flash memory
+    ;if the user requested old values, load those into memory
+    
+    
+    
+    
+     Wait_Milli_Seconds(#255)    
+ Wait_Milli_Seconds(#255)  
+     Wait_Milli_Seconds(#255) 
+     Wait_Milli_Seconds(#255) 
+    ;/set temp 1 
+ 
+ 	
+ 	
+ 	setb CONTINUE 
+    setb SETBUTTON
+    mov a, #0x0
+        	
+	Set_Cursor(1,1)
+    Send_Constant_String(#SETTEMP1)
+
+	
+CONTINUE2?:
+    
+  	Set_Cursor(2, 10)     
+	Display_BCD(temp1_ideal)
+	Set_Cursor(2, 8) 
+	Display_BCD(temp1_ideal+1)
+  ; lcall Display_Accumulator
+	jb CONTINUE, SETHOURS?		;button not pressed, go to SETHOURS?
+    ljmp done2?  
+      
+SETHOURS?:
+	jnb SETBUTTON, HOURS_INCREASE		;button pressed? Increase
+	
+	sjmp CONTINUE2?						;button not pressed, keep polling to continue
+	
+HOURS_INCREASE: 
+	
+	mov a, temp1_ideal
+	add a, #0x10
+	da a
+	mov temp1_ideal, a
+	
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	
+	;mov r4, a ;r2 stores minutes
+	;cjne r4, #0x255, CONTINUE2?
+	
+	;mov temp1_ideal, #0x0
+	
+        
+    ljmp	CONTINUE2?
+    
+      
+done2?:     
+      
+    
+  ;//////////////////////////////////////////////////////////////////////  
+ ;/////////////////end of initialization subroutine//////////////////   
+  ;/////////////////////////////////////////////////////////////////  
+   
+   
+   
     lcall Timer0_Init
     lcall Timer2_Init
-    setb EA   ; Enable Global interrupts
-    lcall LCD_4BIT
+   
+    setb EA 	;Enable Global interrups
+     
+    
     lcall InitSerialPort
     setb half_seconds_flag
 	mov state, #0
@@ -396,7 +241,7 @@ main:
 	; After initialization the program stays in this 'forever' loop
 loop:
 ;Set pwm
-	SET_PWM(pwm)
+	;SET_PWM(pwm)
 	;jmp loop
     ;Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
 
@@ -409,12 +254,61 @@ loop:
 	clr a
 	mov a, temp+0  ;my_variable
 	lcall Display_Accumulator
+	
+	
+	;;;;;;;;get thermocouple reading;;;;;;;;;;;;;;;;;;;;;;;;;
+clr CE_ADC
+mov R0, #00000001B ; Start bit:1
+lcall DO_SPI_G
+mov R0, #10000000B ; Single ended, read channel 0
+lcall DO_SPI_G
+mov a, R1 ; R1 contains bits 8 and 9
+anl a, #00000011B ; We need only the two least significant bits
+mov Result+1, a ; Save result high.
+mov x+1, a
+mov R0, #55H ; It doesn't matter what we transmit...
+lcall DO_SPI_G
+mov Result, R1 ; R1 contains bits 0 to 7. Save result low.
+mov x, R1
+setb CE_ADC
+mov x+2, #0
+mov x+3, #0
+Wait_milli_seconds(#255)
+Wait_milli_seconds(#255)
+Wait_milli_seconds(#255)
+;;;;;math
+
+load_Y(50000)
+lcall mul32
+load_Y(1023)
+lcall div32
+load_Y(128)
+lcall div32
+load_Y(23)
+lcall add32
+
+;//////////////math ends//////////////////////////////////////////////////////////////////////
+lcall hex2bcd
+mov tempreal, bcd
+
+;;;;///////////////////////////////////////////DISPLAYING TO PUTTY;///////////////////////////////
+;send_bcd(bcd+1)
+;send_bcd(bcd+0)
+;mov a, #'\r'
+;lcall putchar
+;mov a, #'\n'
+;lcall putchar
+;/////////////////////////////////////////////////////////////////////////////////////////////////
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+	
 
 	Set_Cursor(2, 10)
+	display_BCD(tempreal)
+	Set_Cursor(2, 14)
 	clr a
-	mov a, temp+1  ;my_variable
+	mov a, temp  ;my_variable
 	lcall Display_Accumulator
-
 ;	lcall Save_Configuration
 	
 state0:
