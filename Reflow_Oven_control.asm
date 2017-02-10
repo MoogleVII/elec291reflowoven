@@ -65,6 +65,7 @@ temp:		  ds 1
 oven: 		  ds 1
 temp1_ideal:  ds 2
 result:		  ds 4
+time:		  ds 2
 
 ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
@@ -126,6 +127,9 @@ main:
 	mov pwm+1, #high(0)	
 	mov oven, #0 			;dummy variable for testing
 	mov temp, #125			; 		" 		"
+	mov sec, #0				;timer for states
+	mov time, #0			;timer for whole program
+	
 	
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
 	Set_Cursor(1, 1)
@@ -144,15 +148,7 @@ loop:
     ;Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
 
 ;display state & if oven is on or off
-	Set_Cursor(1 , 14)
-	mov a, state ;state keeps track of the state# we are in
-	lcall Display_Accumulator
-	
-	Set_Cursor(2, 14)
-	clr a
-	mov a, temp+0 
-	lcall Display_Accumulator
-	
+
 	
 ;;;;;;;;get thermocouple reading;;;;;;;;;;;;;;;;;;;;;;;;;
 	clr CE_ADC
@@ -171,8 +167,8 @@ loop:
 	setb CE_ADC
 	mov x+2, #0
 	mov x+3, #0
-	Wait_milli_seconds(#255)
-	Wait_milli_seconds(#255)
+	;Wait_milli_seconds(#255)
+	;Wait_milli_seconds(#255)
 	Wait_milli_seconds(#255)
 	
 	
@@ -194,28 +190,41 @@ loop:
 
 
 ;;;;///////////////////////////////////////////DISPLAYING TO PUTTY;///////////////////////////////
-	;send_bcd(bcd+1)
-	;send_bcd(bcd+0)
-	;mov a, #'\r'
-	;lcall putchar
-	;mov a, #'\n'
-	;lcall putchar
+	send_bcd(tempreal+1)
+	send_bcd(tempreal+0)
+	mov a, #'\r'
+	lcall putchar
+	mov a, #'\n'
+	lcall putchar
 ;/////////////////////////////////////////////////////////////////////////////////////////////////
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 	
 
-	Set_Cursor(2, 10)
-	mov a, tempreal+0
-	lcall Display_Accumulator
-	Set_Cursor(2, 8)
-	mov a, tempreal+1
-	lcall Display_Accumulator
-	;display_BCD(tempreal)
 	Set_Cursor(2, 14)
-	clr a
-	mov a, temp  ;my_variable
+	mov a, tempreal+0
+	;lcall Display_Accumulator
+	Display_BCD(tempreal+0)
+	Set_Cursor(2, 12)
+	mov a, tempreal+1
+	Display_BCD(tempreal+1)
+	
+	;lcall Display_Accumulator
+	
+	Set_Cursor(1 , 14)
+	mov a, state ;state keeps track of the state# we are in
 	lcall Display_Accumulator
+	
+	Set_Cursor(1, 6)
+	clr a
+	mov a, time 
+	lcall Display_Accumulator
+	
+	;display_BCD(tempreal)
+	;Set_Cursor(2, 14)
+	;clr a
+	;mov a, temp  ;my_variable
+	;lcall Display_Accumulator
 ;	lcall Save_Configuration
 
 state0:
@@ -228,39 +237,52 @@ state0:
 	jb P0.1, state0_done
 	jnb P0.1, $
 	mov state, #1
+	mov time, #0
 state0_done:
 	ljmp loop
 state1: ;cmp temp
 	cjne a, #1, state2
 	mov pwm+0, #low(500) ;100%duty cycle (500/500ms = 100%)
 	mov pwm+0, #high(500) 
-	mov sec, #0
-	mov a, #150 ;change to memory temp at state1
+
 	clr c
-	subb a, temp ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
+	mov a, #low(150) ;;;;;;;;;;;;;;;;
+	subb a, tempreal+0
+	mov a, #high(150);;;;;;;;;;;;;;;	
+						;TODO!!! change this to temp. variable 1
+	
+	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
 	jnc state1_done ;come out of this state if a<temp, stay in state 1
 	mov state, #2
+	mov sec, #0    ;set timer to 0 for comparison in next state
 state1_done:
 	ljmp loop
 state2: ;cmp time
 	cjne a, #2, state3
 	mov pwm+0, #low(100) ; 20% duty cycle (100/500ms = 20%)
 	mov pwm+1, #high(100)
-	mov a, #60
+	mov a, #60				
+					;Change this to time variable 1
+					
 	clr c
-	subb a,sec
+	subb a, sec
 	jnc state2_done
 	mov state, #3
+	mov sec, #0
 state2_done:
 	ljmp loop
 state3: ;cmp temp
 	cjne a, #3, state4
 	mov pwm+0, #low(500) ;100%duty cycle
 	mov pwm+0, #high(500)
-	mov sec, #0
-	mov a, #220 ;
+	
+	
 	clr c
-	subb a, temp ; 
+	mov a, #low(220) ;
+	subb a, tempreal+0
+	mov a, #high(220)
+						;change this to temp. variable 2
+						
 	jnc state3_done
 	mov state, #4
 state3_done:
@@ -280,9 +302,13 @@ state5: ;cmp temp
 	;cjne a, #5, state0
 	mov pwm+0, #0 ;Disable oven to let cooling happen
 	mov pwm+1, #0
-	mov a, #60
+	
 	clr c
-	subb a, temp ;if 
+	mov a, #low(60)
+	subb a, tempreal+0
+	mov a, #high(60)
+						;change this to time variable 3
+	subb a, tempreal+1 ;if 
 	jc state5_done ;
 	mov state, #0
 state5_done:

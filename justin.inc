@@ -46,12 +46,13 @@ Inc_Done_0:
 	mov a, Count1ms_2+0
 	;TODO change value in brackets to be a variable
 	
-	cjne a, #low(500), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
+	cjne a, #low(1000), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
 	mov a, Count1ms_2+1
-	cjne a, #high(500), Timer0_ISR_done
+	cjne a, #high(1000), Timer0_ISR_done
 	
 	; X milliseconds have passed - turn on or off oven 
-	inc temp
+	inc sec
+	inc time
 	;x milliseconds have not passed, turn off oven
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
