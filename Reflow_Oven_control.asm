@@ -111,6 +111,32 @@ SETTEMP1: db 'Set Temp 1:',0
 ; initialization and 'forever'    ;
 ; loop.                           ;
 ;---------------------------------;
+
+
+;Rading average from ADC
+
+Average_ADC_Channel MAC 
+	mov b, #%0 
+	lcall ?Average_ADC_Channel 
+ENDMAC
+	?Average_ADC_Channel: 
+	Load_x(0) 
+	mov R5, #100
+	Sum_loop0: 
+	;Read_ADC_Channel(#0) 
+	mov y+3, #0
+	mov y+2, #0
+	mov y+1, R7 
+	mov y+0, R6 
+	lcall add32 
+	djnz R5, Sum_loop0 
+	load_y(100) 
+	lcall div32 
+	ret
+;-------
+
+
+
 main:
 	
 	; Initialization
@@ -136,18 +162,9 @@ main:
     Send_Constant_String(#Initial_Message)
 	Set_Cursor(2, 1)
     Send_Constant_String(#Line_2)
-    
-;	lcall Load_Configuration
-;	Set_Cursor(2, 14)
-;	mov a, my_variable
-;	lcall Display_Accumulator
-	
+
 	; After initialization the program stays in this 'forever' loop
 loop:
-
-    ;Change_8bit_Variable(MY_VARIABLE_BUTTON, my_variable, loop_c)
-
-;display state & if oven is on or off
 
 	
 ;;;;;;;;get thermocouple reading;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -167,10 +184,10 @@ loop:
 	setb CE_ADC
 	mov x+2, #0
 	mov x+3, #0
-	;Wait_milli_seconds(#255)
-	;Wait_milli_seconds(#255)
 	Wait_milli_seconds(#255)
 	
+	
+	;Average_ADC_Channel(#100)
 	
 ;;;;;math
 	load_Y(50000)
@@ -181,7 +198,7 @@ loop:
 	lcall div32
 	load_Y(23)
 	lcall add32
-
+	
 
 ;//////////////math ends//////////////////////////////////////////////////////////////////////
 	lcall hex2bcd
@@ -227,8 +244,8 @@ loop:
 	;lcall Display_Accumulator
 ;	lcall Save_Configuration
 
-state0:
 	mov a, state
+state0:
 	cjne a, #0, state1
 	mov pwm+0, #0
 	mov pwm+1, #0
@@ -243,16 +260,19 @@ state0_done:
 state1: ;cmp temp
 	cjne a, #1, state2
 	mov pwm+0, #low(500) ;100%duty cycle (500/500ms = 100%)
-	mov pwm+0, #high(500) 
+	mov pwm+1, #high(500) 
 
 	clr c
+
 	mov a, #low(150) ;;;;;;;;;;;;;;;;
 	subb a, tempreal+0
 	mov a, #high(150);;;;;;;;;;;;;;;	
+	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
+						
 						;TODO!!! change this to temp. variable 1
 	
-	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
 	jnc state1_done ;come out of this state if a<temp, stay in state 1
+
 	mov state, #2
 	mov sec, #0    ;set timer to 0 for comparison in next state
 state1_done:
@@ -274,7 +294,7 @@ state2_done:
 state3: ;cmp temp
 	cjne a, #3, state4
 	mov pwm+0, #low(500) ;100%duty cycle
-	mov pwm+0, #high(500)
+	mov pwm+1, #high(500)
 	
 	
 	clr c
@@ -313,5 +333,7 @@ state5: ;cmp temp
 	mov state, #0
 state5_done:
 	ljmp loop
+	
 		
+	
 END
