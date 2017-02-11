@@ -237,6 +237,12 @@ loop:
 	mov a, time 
 	lcall Display_Accumulator
 	
+	
+	Set_Cursor(2, 6)
+	clr a
+	mov a, sec
+	lcall Display_Accumulator
+	
 	;display_BCD(tempreal)
 	;Set_Cursor(2, 14)
 	;clr a
@@ -259,19 +265,34 @@ state0_done:
 	ljmp loop
 state1: ;cmp temp
 	cjne a, #1, state2
-	mov pwm+0, #low(500) ;100%duty cycle (500/500ms = 100%)
-	mov pwm+1, #high(500) 
+	mov pwm+0, #low(501) ;100%duty cycle (500/500ms = 100%)
+	mov pwm+1, #high(501) 
 
 	clr c
 
-	mov a, #low(150) ;;;;;;;;;;;;;;;;
-	subb a, tempreal+0
-	mov a, #high(150);;;;;;;;;;;;;;;	
-	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
-						
-						;TODO!!! change this to temp. variable 1
+	;mov a, #150 ;;;;;;;;;;;;;;;; wrong
+	;subb a, tempreal;+0
+;	mov a, #high(150);;;;;;;;;;;;;;;	
+;	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
+	;load_x(150)
+
+	;mov a, #low(150)
+	;subb a, #tempreal+0
 	
-	jnc state1_done ;come out of this state if a<temp, stay in state 1
+	mov a, #150
+	subb a, x
+	;tempreal	
+	jnc state1_done
+	
+	;clr c
+	;mov a, #high(150)
+	;subb a, #tempreal+1
+	
+
+						;TODO!!! change this to temp. variable 1
+	jnc state1_done
+	
+;	jnc state1_done ;come out of this state if a<temp, stay in state 1
 
 	mov state, #2
 	mov sec, #0    ;set timer to 0 for comparison in next state
@@ -293,18 +314,20 @@ state2_done:
 	ljmp loop
 state3: ;cmp temp
 	cjne a, #3, state4
-	mov pwm+0, #low(500) ;100%duty cycle
-	mov pwm+1, #high(500)
+	mov pwm+0, #low(501) ;100%duty cycle
+	mov pwm+1, #high(501)
 	
 	
 	clr c
-	mov a, #low(220) ;
-	subb a, tempreal+0
-	mov a, #high(220)
+	mov a, #200 ;
+	subb a, x
+	;	mov a, #high(220)
+;	subb a, tempreal+1
 						;change this to temp. variable 2
 						
 	jnc state3_done
 	mov state, #4
+	mov sec, #0
 state3_done:
 	ljmp loop
 state4: ;cmp time
