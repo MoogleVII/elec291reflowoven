@@ -12,12 +12,8 @@ Timer0_Init:
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	; Enable the timer and interrupts
-	; Init One millisecond interrupt counter.
     setb ET0  ; Enable timer 0 interrupt
-    setb TR0  ; Start timer 0
-    clr a
-	mov Count1ms_2+0, a
-	mov Count1ms_2+1, a
+    clr TR0  ; Start timer 0
 	ret
 
 ;---------------------------------;
@@ -27,44 +23,12 @@ Timer0_Init:
 Timer0_ISR:
 	;clr TF0  ; According to the data sheet this is done for us already.
 	; In mode 1 we need to reload the timer.
-	push acc
-	push psw
-	
 	clr TR0
 	mov TH0, #high(TIMER0_RELOAD)
 	mov TL0, #low(TIMER0_RELOAD)
 	setb TR0
-	
-	inc Count1ms_2+0    ; Increment the low 8-bits first
-	mov a, Count1ms_2+0 ; If the low 8-bits overflow, then increment high 8-bits
-	jnz Inc_Done_0
-	inc Count1ms_2+1
-
-Inc_Done_0:
-	
-	; Check if half second has passed
-	mov a, Count1ms_2+0
-	;TODO change value in brackets to be a variable
-	
-	cjne a, #low(1000), Timer0_ISR_done ; Warning: this instruction changes the carry flag!
-	mov a, Count1ms_2+1
-	cjne a, #high(1000), Timer0_ISR_done
-	
-	; X milliseconds have passed - turn on or off oven 
-	inc sec
-	inc time
-	;x milliseconds have not passed, turn off oven
-	; Reset to zero the milli-seconds counter, it is a 16-bit variable
-	clr a
-	mov Count1ms_2+0, a
-	mov Count1ms_2+1, a
-	
-Timer0_ISR_done:
-	
-	pop psw
-	pop acc
+	cpl SOUND_OUT ; Connect speaker to P3.7!
 	reti
-
 
 ;increment counter
 ;Some logic to enable bit for 100%, 20%, 0% of 1 sec based on variable vs counter
@@ -182,14 +146,18 @@ Inc_Done:
 
 	; Check if half second has passed
 	mov a, Count1ms+0
-	cjne a, #low(500), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+	cjne a, #low(1000), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
 	mov a, Count1ms+1
-	cjne a, #high(500), Timer2_ISR_done
+	cjne a, #high(1000), Timer2_ISR_done
 	
 	; 500 milliseconds have passed.  Set a flag so the main program knows
 	setb half_seconds_flag ; Let the main program know half second had passed
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
-
+	
+	
+	inc sec
+	inc time
+;	cpl TR0
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a

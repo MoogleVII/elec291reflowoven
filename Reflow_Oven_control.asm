@@ -11,7 +11,7 @@ $LIST
 CLK           EQU 22118400 ; Microcontroller system crystal frequency in Hz
 BAUD          equ 115200
 T1LOAD        equ (0x100-(CLK/(16*BAUD)))
-TIMER0_RATE   EQU 1000 ;1000hz for timer tick of 1ms 
+TIMER0_RATE   EQU 4096 ;1000hz for timer tick of 1ms 
 TIMER0_RELOAD EQU ((65536-(CLK/TIMER0_RATE)))
 TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
@@ -261,12 +261,14 @@ state0:
 	jnb P0.1, $
 	mov state, #1
 	mov time, #0
+	cpl TR0
 state0_done:
 	ljmp loop
 state1: ;cmp temp
+	clr TR0
 	cjne a, #1, state2
-	mov pwm+0, #low(501) ;100%duty cycle (500/500ms = 100%)
-	mov pwm+1, #high(501) 
+	mov pwm+0, #low(1001) ;100%duty cycle (500/500ms = 100%)
+	mov pwm+1, #high(1001) 
 
 	clr c
 
@@ -279,7 +281,7 @@ state1: ;cmp temp
 	;mov a, #low(150)
 	;subb a, #tempreal+0
 	
-	mov a, #150
+	mov a, #140
 	subb a, x
 	;tempreal	
 	jnc state1_done
@@ -296,12 +298,14 @@ state1: ;cmp temp
 
 	mov state, #2
 	mov sec, #0    ;set timer to 0 for comparison in next state
+	cpl TR0
 state1_done:
 	ljmp loop
 state2: ;cmp time
+	clr TR0
 	cjne a, #2, state3
-	mov pwm+0, #low(100) ; 20% duty cycle (100/500ms = 20%)
-	mov pwm+1, #high(100)
+	mov pwm+0, #low(200) ; 20% duty cycle (100/500ms = 20%)
+	mov pwm+1, #high(200)
 	mov a, #60				
 					;Change this to time variable 1
 					
@@ -310,16 +314,18 @@ state2: ;cmp time
 	jnc state2_done
 	mov state, #3
 	mov sec, #0
+	cpl TR0
 state2_done:
 	ljmp loop
 state3: ;cmp temp
+	clr TR0
 	cjne a, #3, state4
-	mov pwm+0, #low(501) ;100%duty cycle
-	mov pwm+1, #high(501)
+	mov pwm+0, #low(1001) ;100%duty cycle
+	mov pwm+1, #high(1001)
 	
 	
 	clr c
-	mov a, #200 ;
+	mov a, #220 ;
 	subb a, x
 	;	mov a, #high(220)
 ;	subb a, tempreal+1
@@ -328,17 +334,22 @@ state3: ;cmp temp
 	jnc state3_done
 	mov state, #4
 	mov sec, #0
+	cpl TR0
 state3_done:
 	ljmp loop
 state4: ;cmp time
+	clr TR0
 	cjne a, #4, state5
-	mov pwm+0, #low(100)
-	mov pwm+1, #high(100)
-	mov sec, #45
+	mov pwm+0, #low(200)
+	mov pwm+1, #high(200)
+	mov a, #45
 	clr c
 	subb a, sec
 	jnc state4_done
 	mov state, #5
+	cpl TR0
+	mov sec, #0
+	
 state4_done:
 	ljmp loop
 state5: ;cmp temp
@@ -347,13 +358,12 @@ state5: ;cmp temp
 	mov pwm+1, #0
 	
 	clr c
-	mov a, #low(60)
-	subb a, tempreal+0
-	mov a, #high(60)
-						;change this to time variable 3
-	subb a, tempreal+1 ;if 
-	jc state5_done ;
+	mov a, #60
+	subb a, x 
+	jc state5_done
+	
 	mov state, #0
+	clr TR0
 state5_done:
 	ljmp loop
 	
