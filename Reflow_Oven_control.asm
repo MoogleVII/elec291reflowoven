@@ -18,12 +18,13 @@ TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
 BOOT_BUTTON  		 equ P4.5
 SOUND_OUT    		 equ P3.7
-SETBUTTON 		     equ P0.6	
+	
 CONTINUE    	     equ P0.0
-SHIFT_BUTTON         equ P0.7
-MY_VARIABLE_BUTTON   equ P0.4
 restart_button       equ P0.1
-
+MY_VARIABLE_BUTTON   equ P0.3
+increment_button     equ P0.5
+SETBUTTON 		     equ P2.4
+SHIFT_BUTTON         equ P2.6
 
 ; Reset vector
 org 0x0000
@@ -67,6 +68,12 @@ temp1_ideal:  ds 2
 result:		  ds 4
 time:		  ds 2
 
+state1tempVal:ds 1
+state2secVal:ds 1
+state3tempVal:ds 1
+state4secVal:ds 1
+state5tempVal:ds 1
+
 ; In the 8051 we have variables that are 1-bit in size.  We can use the setb, clr, jb, and jnb
 ; instructions with these variables.  This is how you define a 1-bit variable:
 bseg
@@ -90,7 +97,8 @@ MY_SCLK EQU P2.3
 $NOLIST
 $include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
 $include(justin.inc)
-$include(math32.inc) ; A library of LCD related functions and utility macros
+$include(math32.inc)
+$include(davin.inc) ; A library of LCD related functions and utility macros
 ;$include(setSTUFF.inc) ; setting the time and temps relating to the reflow oven
 $LIST
 ;                     1234567890123456    <- This helps determine the location of the counter
@@ -157,11 +165,80 @@ main:
 	mov time, #0			;timer for whole program
 	
 	
+
+lcall Load_Configuration
+	
+	
+	;///////RYAN + DAVIN ////////////
+	;///////IMPLEMENTATION///////////
+	;///////OF SETTING	 ////////////  
+	;///////VARIABLES////////////////
+	Set_Cursor(2,1)
+	Send_Constant_String(#state1temp)
+	ComebackState1:
+	Set_Cursor(2,14)
+	increment(increment_button, state1tempVal)
+	lcall Save_Configuration
+	jb SETBUTTON, ComebackState1 
+	;now state1temp is set
+	wait_milli_seconds(#255)
+	
+	Set_Cursor(2,1)
+	Send_Constant_String(#state2sec)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	ComebackState2:
+	Set_Cursor(2,14)
+	increment(increment_button, state2secVal)
+	jb SETBUTTON, ComebackState2
+	lcall Save_Configuration
+	;now state2sec is set
+	wait_milli_seconds(#255)
+	
+	Set_Cursor(2,1)
+	Send_Constant_String(#state3temp)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	ComebackState3:
+	Set_Cursor(2,14)
+	increment(increment_button, state3tempVal)
+	jb SETBUTTON, ComebackState3
+	lcall Save_Configuration
+	;now state3 temperature is set
+	wait_milli_seconds(#255)
+	
+	Set_Cursor(2,1)
+	Send_Constant_String(#state4sec)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	ComebackState4:
+	Set_Cursor(2,14)
+	increment(increment_button, state4secVal)
+	jb SETBUTTON, ComebackState4
+	lcall Save_Configuration
+	;now state4 seconds is set
+	wait_milli_seconds(#255)
+	
+	Set_Cursor(2,1)
+	Send_Constant_String(#state5temp)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	ComebackState5:
+	Set_Cursor(2,14)
+	increment(increment_button, state5tempVal)
+	lcall Save_Configuration
+	jb SETBUTTON, ComebackState5	
+	wait_milli_seconds(#255)	
+	
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
 	Set_Cursor(1, 1)
     Send_Constant_String(#Initial_Message)
 	Set_Cursor(2, 1)
     Send_Constant_String(#Line_2)
+
+
+
+
 
 	; After initialization the program stays in this 'forever' loop
 loop:
@@ -243,18 +320,11 @@ loop:
 	mov a, sec
 	lcall Display_Accumulator
 	
-	;display_BCD(tempreal)
-	;Set_Cursor(2, 14)
-	;clr a
-	;mov a, temp  ;my_variable
-	;lcall Display_Accumulator
-;	lcall Save_Configuration
-
 	mov a, state
 state0:
 	cjne a, #0, state1
 	mov pwm+0, #0
-	mov pwm+1, #0
+	mov pwm+1, #0	
 	jb P0.1, state0_done
 	Wait_milli_seconds(#50)
 	jb P0.1, state0_done
@@ -269,33 +339,13 @@ state1: ;cmp temp
 	cjne a, #1, state2
 	mov pwm+0, #low(1001) ;100%duty cycle (500/500ms = 100%)
 	mov pwm+1, #high(1001) 
-
+	
 	clr c
-
-	;mov a, #150 ;;;;;;;;;;;;;;;; wrong
-	;subb a, tempreal;+0
-;	mov a, #high(150);;;;;;;;;;;;;;;	
-;	subb a, tempreal+1 ;temp is real time reading from port. if temp greater than a, doens't set carry c, c=0
-	;load_x(150)
-
-	;mov a, #low(150)
-	;subb a, #tempreal+0
-	
-	mov a, #140
+	clr a
+	mov a, state1tempval
 	subb a, x
-	;tempreal	
+				
 	jnc state1_done
-	
-	;clr c
-	;mov a, #high(150)
-	;subb a, #tempreal+1
-	
-
-						;TODO!!! change this to temp. variable 1
-	jnc state1_done
-	
-;	jnc state1_done ;come out of this state if a<temp, stay in state 1
-
 	mov state, #2
 	mov sec, #0    ;set timer to 0 for comparison in next state
 	cpl TR0
@@ -306,11 +356,11 @@ state2: ;cmp time
 	cjne a, #2, state3
 	mov pwm+0, #low(200) ; 20% duty cycle (100/500ms = 20%)
 	mov pwm+1, #high(200)
-	mov a, #60				
-					;Change this to time variable 1
+	mov a, state2secVal				
 					
 	clr c
 	subb a, sec
+
 	jnc state2_done
 	mov state, #3
 	mov sec, #0
@@ -321,15 +371,10 @@ state3: ;cmp temp
 	clr TR0
 	cjne a, #3, state4
 	mov pwm+0, #low(1001) ;100%duty cycle
-	mov pwm+1, #high(1001)
-	
-	
+	mov pwm+1, #high(1001)	
 	clr c
-	mov a, #220 ;
+	mov a, state3tempVal 
 	subb a, x
-	;	mov a, #high(220)
-;	subb a, tempreal+1
-						;change this to temp. variable 2
 						
 	jnc state3_done
 	mov state, #4
@@ -342,9 +387,11 @@ state4: ;cmp time
 	cjne a, #4, state5
 	mov pwm+0, #low(200)
 	mov pwm+1, #high(200)
-	mov a, #45
+
+	mov a, state4secVal
 	clr c
 	subb a, sec
+	
 	jnc state4_done
 	mov state, #5
 	cpl TR0
@@ -353,12 +400,11 @@ state4: ;cmp time
 state4_done:
 	ljmp loop
 state5: ;cmp temp
-	;cjne a, #5, state0
 	mov pwm+0, #0 ;Disable oven to let cooling happen
 	mov pwm+1, #0
 	
 	clr c
-	mov a, #60
+	mov a, state5tempVal
 	subb a, x 
 	jc state5_done
 	

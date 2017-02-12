@@ -122,6 +122,7 @@ Timer2_Init:
 ; ISR for timer 2                 ;
 ;---------------------------------;
 Timer2_ISR:
+	
 	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
 	cpl P0.3
 	; The two registers used in the ISR must be saved in the stack
@@ -168,80 +169,6 @@ Timer2_ISR_done:
 	pop psw
 	pop acc
 	reti
-
-Save_Configuration:
-	; Erase FDATA page 1
-	clr EA ; No interrupts please!
-	mov MEMCON, #01011000B ; AERS=1, MWEN=1, DMEN=1
-	mov DPTR, #0x0000
-	mov a, #0xff
-	movx @DPTR, A
-	; Load page
-	mov MEMCON, #00111000B ; LDPG=1, MWEN=1, DMEN=1
-	; Save variables
-	mov a, my_variable
-	movx @DPTR, A
-	inc DPTR	
-	mov a, #0x55 ; First key value
-	movx @DPTR, A
-	inc DPTR	
-	mov a, #0xAA ; Second key value
-	movx @DPTR, A
-	mov MEMCON, #00011000B ; Copy page to flash
-	mov a, #0xff
-	movx @DPTR, A
-	mov MEMCON, #00000000B ; Disable further access to data flash
-	setb EA ; Re-enable interrupts
-	ret
-
-Load_Configuration:
-	mov MEMCON, #00001000B ; Enable read access to data flash
-	mov dptr, #0x0001 ;First key value location.  Must be 0x55
-	movx a, @dptr
-	cjne a, #0x55, Load_Defaults
-	inc dptr ; Second key value location.  Must be 0xaa
-	movx a, @dptr
-	cjne a, #0xaa, Load_Defaults
-	; Keys are good.  Load saved values.
-	mov dptr, #0x0000
-	movx a, @dptr
-	mov my_variable, a
-	mov MEMCON, #00000000B ; Disable further access to data flash
-	ret
-
-Load_Defaults: ; Load defaults if keys are incorrect
-   mov my_variable, #123
-   mov MEMCON, #00000000B ; Disable access to data flash
-   ret
-   
-   Change_8bit_Variable MAC
-    jb %0, %2
-    Wait_Milli_Seconds(#50)
-    jb %0, %2
-    jnb %0, $
-    jb SHIFT_BUTTON, skip%Mb
-    dec %1
-    sjmp skip%Ma
-skip%Mb:
-    inc %1
-skip%Ma:
-ENDMAC
-
-; Eight bit number to display passed in ‘a’.
-Display_Accumulator:
-	mov b, #100
-	div ab
-	orl a, #0x30 ; Convert hundreds to ASCII
-	lcall ?WriteData ; display ASCII
-	mov a, b    ; Remainder is in register b
-	mov b, #10
-	div ab
-	orl a, #0x30 ; Convert tens to ASCII
-	lcall ?WriteData ; display ASCII
-	mov a, b
-	orl a, #0x30 ; Convert units to ASCII
-	lcall ?WriteData ; display ASCII
-	ret
 	
 
 
