@@ -19,12 +19,11 @@ TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 BOOT_BUTTON  		 equ P4.5
 SOUND_OUT    		 equ P3.7
 	
-CONTINUE    	     equ P0.0
+;CONTINUE    	     equ P0.0
 restart_button       equ P0.1
-MY_VARIABLE_BUTTON   equ P0.3
 increment_button     equ P0.5
 SETBUTTON 		     equ P2.4
-SHIFT_BUTTON         equ P2.6
+;SHIFT_BUTTON         equ P2.6
 
 ; Reset vector
 org 0x0000
@@ -60,7 +59,8 @@ my_variable:  ds 1
 state:        ds 1
 pwm:		  ds 2
 sec:		  ds 1
-power_time:   ds 2 ; to set how much time for oven power to be on
+power_time:   ds 2 ; to set how much 
+ ;for oven power to be on
 tempreal :    ds 1 ; converted temperateure from ADC
 temp:		  ds 1
 oven: 		  ds 1
@@ -295,42 +295,44 @@ loop:
 	
 	
 
-	Set_Cursor(2, 14)
+	Set_Cursor(2, 7)
 	mov a, tempreal+0
 	;lcall Display_Accumulator
 	Display_BCD(tempreal+0)
-	Set_Cursor(2, 12)
+	Set_Cursor(2, 5)
 	mov a, tempreal+1
 	Display_BCD(tempreal+1)
 	
 	;lcall Display_Accumulator
 	
-	Set_Cursor(1 , 14)
+	Set_Cursor(1 , 7)
 	mov a, state ;state keeps track of the state# we are in
 	lcall Display_Accumulator
 	
-	Set_Cursor(1, 6)
+	Set_Cursor(2, 14)
 	clr a
 	mov a, time 
 	lcall Display_Accumulator
 	
 	
-	Set_Cursor(2, 6)
+	Set_Cursor(1, 14)
 	clr a
 	mov a, sec
 	lcall Display_Accumulator
 	
 	mov a, state
 state0:
+	
 	cjne a, #0, state1
+	mov sec, #0
+	mov time, #0
 	mov pwm+0, #0
 	mov pwm+1, #0	
 	jb P0.1, state0_done
 	Wait_milli_seconds(#50)
 	jb P0.1, state0_done
 	jnb P0.1, $
-	mov state, #1
-	mov time, #0
+	mov state, #1	
 	cpl TR0
 state0_done:
 	ljmp loop
@@ -339,7 +341,24 @@ state1: ;cmp temp
 	cjne a, #1, state2
 	mov pwm+0, #low(1001) ;100%duty cycle (500/500ms = 100%)
 	mov pwm+1, #high(1001) 
-	
+	jb P0.1, keepgo1
+	Wait_milli_seconds(#50)
+	jb P0.1, keepgo1
+	jnb P0.1, $
+	mov state, #0
+keepgo1:
+	clr c 
+	clr a 
+	mov a, sec
+	subb a,#60 ;compare whether temp is 50 when it's 60sec
+	jc keepgoing
+isfifty:
+	clr c 
+	clr a 
+	mov a, #50
+	subb a, x 
+	jnc state0 ;if at 60s, the temp is not 50, then go to state0 
+keepgoing:		
 	clr c
 	clr a
 	mov a, state1tempval
@@ -356,6 +375,12 @@ state2: ;cmp time
 	cjne a, #2, state3
 	mov pwm+0, #low(200) ; 20% duty cycle (100/500ms = 20%)
 	mov pwm+1, #high(200)
+	jb P0.1, keepgo2
+	Wait_milli_seconds(#50)
+	jb P0.1, keepgo2
+	jnb P0.1, $
+	mov state, #0
+keepgo2:
 	mov a, state2secVal				
 					
 	clr c
@@ -371,11 +396,17 @@ state3: ;cmp temp
 	clr TR0
 	cjne a, #3, state4
 	mov pwm+0, #low(1001) ;100%duty cycle
-	mov pwm+1, #high(1001)	
+	mov pwm+1, #high(1001)
+	
+	jb P0.1, keepgo3
+	Wait_milli_seconds(#50)
+	jb P0.1, keepgo3
+	jnb P0.1, $
+	mov state, #0
+keepgo3:	
 	clr c
 	mov a, state3tempVal 
-	subb a, x
-						
+	subb a, x					
 	jnc state3_done
 	mov state, #4
 	mov sec, #0
@@ -387,7 +418,12 @@ state4: ;cmp time
 	cjne a, #4, state5
 	mov pwm+0, #low(200)
 	mov pwm+1, #high(200)
-
+	jb P0.1, keepgo4
+	Wait_milli_seconds(#50)
+	jb P0.1, keepgo4
+	jnb P0.1, $
+	mov state, #0
+keepgo4:
 	mov a, state4secVal
 	clr c
 	subb a, sec
@@ -402,7 +438,12 @@ state4_done:
 state5: ;cmp temp
 	mov pwm+0, #0 ;Disable oven to let cooling happen
 	mov pwm+1, #0
-	
+	jb P0.1, keepgo5
+	Wait_milli_seconds(#50)
+	jb P0.1, keepgo5
+	jnb P0.1, $
+	mov state, #0
+keepgo5:
 	clr c
 	mov a, state5tempVal
 	subb a, x 
