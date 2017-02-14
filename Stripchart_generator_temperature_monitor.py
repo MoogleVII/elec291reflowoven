@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import sys, time, math
-import serial
+import sys, time, math, serial, smtplib
 
 ser = serial.Serial(
     port='COM9',
@@ -11,16 +10,31 @@ ser = serial.Serial(
     stopbits=serial.STOPBITS_ONE,
     bytesize=serial.EIGHTBITS
 )
-ser.isOpen()
-    
+ser.isOpen()    
 xsize=50
+   
+  
+state5 = 0
    
 def data_gen():
     t = data_gen.t
     while True:
        t+=1
        val=ser.readline()
-       yield t, val
+       
+	   if val > 200
+	       state5 = 1
+		   server = smtplib.SMTP('smtp.gmail.com', 587)
+		   server.starttls()
+           server.login("flow.oven@gmail.com", "reflowdat") 
+       if state5 == 1
+	       if val < 200        
+		       msg = "SOlDER HAS BEEN REFLOWED. PLEASE COLLECT. HELP ME"
+               subject = "HELLO"
+			   server.sendmail("flow.oven@gmail.com", "davin.birdi@hotmail.ca", msg)
+			   server.quit()	   
+	   
+	   yield t, val
 
 def run(data):
     # update the data
