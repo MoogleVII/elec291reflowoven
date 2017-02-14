@@ -66,7 +66,7 @@ temp:		  ds 1
 oven: 		  ds 1
 temp1_ideal:  ds 2
 result:		  ds 4
-time:		  ds 2
+time:		  ds 3
 
 state1tempVal:ds 1
 state2secVal:ds 1
@@ -163,7 +163,6 @@ main:
 	mov temp, #125			; 		" 		"
 	mov sec, #0				;timer for states
 	mov time, #0			;timer for whole program
-	
 	
 
 lcall Load_Configuration
@@ -337,6 +336,11 @@ state0:
 state0_done:
 	ljmp loop
 state1: ;cmp temp
+	
+
+	
+	
+	
 	clr TR0
 	cjne a, #1, state2
 	mov pwm+0, #low(1001) ;100%duty cycle (500/500ms = 100%)
@@ -373,8 +377,8 @@ state1_done:
 state2: ;cmp time
 	clr TR0
 	cjne a, #2, state3
-	mov pwm+0, #low(200) ; 20% duty cycle (100/500ms = 20%)
-	mov pwm+1, #high(200)
+	mov pwm+0, #low(300) ; 20% duty cycle (100/500ms = 20%)
+	mov pwm+1, #high(300)
 	jb P0.1, keepgo2
 	Wait_milli_seconds(#50)
 	jb P0.1, keepgo2
@@ -416,8 +420,8 @@ state3_done:
 state4: ;cmp time
 	clr TR0
 	cjne a, #4, state5
-	mov pwm+0, #low(200)
-	mov pwm+1, #high(200)
+	mov pwm+0, #low(300)
+	mov pwm+1, #high(300)
 	jb P0.1, keepgo4
 	Wait_milli_seconds(#50)
 	jb P0.1, keepgo4
@@ -436,6 +440,14 @@ keepgo4:
 state4_done:
 	ljmp loop
 state5: ;cmp temp
+	
+	mov R0, #50
+long_beep:
+	setb TR0
+	wait_milli_seconds(#50)
+	djnz R0, long_beep
+	clr TR0
+	
 	mov pwm+0, #0 ;Disable oven to let cooling happen
 	mov pwm+1, #0
 	jb P0.1, keepgo5
